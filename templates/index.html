@@ -414,7 +414,16 @@
                 
                 <!-- Reconciliation Section -->
                 <div class="reconciliation-section" style="margin-bottom: 32px; text-align: left;">
-                    <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px; color: var(--text-main);">Mathematical Reconciliation</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0;">Mathematical Reconciliation</h3>
+                        <button class="btn" id="viewSummaryPageBtn" style="
+                            padding: 8px 16px; font-size: 0.8rem;
+                            background: rgba(127, 0, 255, 0.08);
+                            border: 1px solid rgba(127, 0, 255, 0.2);
+                            color: #e100ff; width: auto; font-weight: 600;
+                            cursor: pointer; transition: all 0.2s ease; margin-top: 0;
+                        ">Show Summary Page</button>
+                    </div>
                     <div id="reconciliationCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
                         <!-- Reconciliation Cards loaded dynamically -->
                     </div>
@@ -739,6 +748,138 @@
         function hideAlert() {
             alertBox.style.display = 'none';
         }
+
+        // --- Summary Modal Logic ---
+        const summaryModal = document.getElementById('summaryModal');
+        const summaryModalContent = document.getElementById('summaryModalContent');
+        const summaryModalTitle = document.getElementById('summaryModalTitle');
+        const summaryModalImage = document.getElementById('summaryModalImage');
+        const closeSummaryModalBtn = document.getElementById('closeSummaryModalBtn');
+        const viewSummaryPageBtn = document.getElementById('viewSummaryPageBtn');
+
+        function openModal(imageSrc, title) {
+            summaryModalImage.src = imageSrc;
+            summaryModalTitle.textContent = title;
+            summaryModal.style.display = 'flex';
+            // Force reflow
+            summaryModal.offsetHeight;
+            summaryModal.style.opacity = '1';
+            summaryModalContent.style.transform = 'scale(1)';
+        }
+
+        function closeModal() {
+            summaryModal.style.opacity = '0';
+            summaryModalContent.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                summaryModal.style.display = 'none';
+                summaryModalImage.src = '';
+            }, 300);
+        }
+
+        closeSummaryModalBtn.addEventListener('click', closeModal);
+        summaryModal.addEventListener('click', (e) => {
+            if (e.target === summaryModal) {
+                closeModal();
+            }
+        });
+
+        viewSummaryPageBtn.addEventListener('click', () => {
+            if (currentResult && currentResult.summary_page_image) {
+                const title = `Statement Summary (Page ${currentResult.summary_page})`;
+                const src = `data:image/png;base64,${currentResult.summary_page_image}`;
+                openModal(src, title);
+            } else {
+                alert('No summary page image available.');
+            }
+        });
+
+        viewSummaryPageBtn.addEventListener('mouseenter', () => {
+            viewSummaryPageBtn.style.transform = 'translateY(-1px)';
+            viewSummaryPageBtn.style.boxShadow = '0 4px 12px rgba(127, 0, 255, 0.15)';
+        });
+        viewSummaryPageBtn.addEventListener('mouseleave', () => {
+            viewSummaryPageBtn.style.transform = 'none';
+            viewSummaryPageBtn.style.boxShadow = 'none';
+        });
     </script>
+
+    <!-- Modal for showing statement summary page -->
+    <div id="summaryModal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    ">
+        <div style="
+            background: #141722;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            max-width: 90%;
+            max-height: 90%;
+            width: 800px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            position: relative;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        " id="summaryModalContent">
+            <!-- Modal Header -->
+            <div style="
+                padding: 16px 24px;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main);" id="summaryModalTitle">Statement Summary Page</h3>
+                <button id="closeSummaryModalBtn" style="
+                    background: transparent;
+                    border: none;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    padding: 4px;
+                    border-radius: 50%;
+                    transition: all 0.2s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <!-- Modal Body (Image Container) -->
+            <div style="
+                padding: 20px;
+                overflow-y: auto;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                background: #0b0c10;
+                border-radius: 0 0 20px 20px;
+            ">
+                <img id="summaryModalImage" src="" alt="Summary Page Image" style="
+                    max-width: 100%;
+                    max-height: 70vh;
+                    object-fit: contain;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    border: 1px solid var(--border-color);
+                ">
+            </div>
+        </div>
+    </div>
 </body>
 </html>

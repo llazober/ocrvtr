@@ -688,7 +688,7 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print(f"WARNING: Total difference of ${total_diff:.2f}.")
         
-    return formatted_df, reconciliation
+    return formatted_df, reconciliation, summary_page
 
 def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING PNC BANK PROCESSING ===")
@@ -880,7 +880,7 @@ def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation
+    return formatted_df, reconciliation, 1
 
 def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING BANK OF AMERICA PROCESSING ===")
@@ -1085,7 +1085,7 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation
+    return formatted_df, reconciliation, 1
 
 def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING TD BANK PROCESSING ===")
@@ -1277,7 +1277,7 @@ def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation
+    return formatted_df, reconciliation, 1
 
 def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING TRUIST BANK PROCESSING ===")
@@ -1501,7 +1501,7 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation
+    return formatted_df, reconciliation, 1
 
 def run_extraction(pdf_path, temp_dir, create_csv=False):
     convert_pdf_to_png(pdf_path, temp_dir)
@@ -1537,21 +1537,30 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
         all_pages_words[page_name] = words
         
     if bank_type == 'WELLS_FARGO':
-        formatted_df, reconciliation = run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page = run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output_path)
     elif bank_type == 'BANK_OF_AMERICA':
-        formatted_df, reconciliation = run_boa_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page = run_boa_pipeline(all_pages_words, pdf_path, csv_output_path)
     elif bank_type == 'TD_BANK':
-        formatted_df, reconciliation = run_td_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page = run_td_pipeline(all_pages_words, pdf_path, csv_output_path)
     elif bank_type == 'TRUIST':
-        formatted_df, reconciliation = run_truist_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page = run_truist_pipeline(all_pages_words, pdf_path, csv_output_path)
     else:
-        formatted_df, reconciliation = run_pnc_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page = run_pnc_pipeline(all_pages_words, pdf_path, csv_output_path)
         
+    import base64
+    summary_img_path = os.path.join(temp_dir, f"page_{summary_page}.png")
+    summary_page_image_b64 = ""
+    if os.path.exists(summary_img_path):
+        with open(summary_img_path, "rb") as img_file:
+            summary_page_image_b64 = base64.b64encode(img_file.read()).decode('utf-8')
+            
     # Convert NaN to None for JSON compliance
     clean_df = formatted_df.astype(object).where(pd.notnull(formatted_df), None)
     return {
         "bank_type": bank_type,
         "business_name": bus_name,
         "transactions": clean_df.to_dict(orient='records'),
-        "reconciliation": reconciliation
+        "reconciliation": reconciliation,
+        "summary_page": summary_page,
+        "summary_page_image": summary_page_image_b64
     }
