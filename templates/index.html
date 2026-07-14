@@ -335,9 +335,28 @@
 <body>
 
     <div class="container">
-        <header>
+        <header style="position: relative;">
             <h1>Bank Statement Extractor</h1>
-            <p class="subtitle">Extract and reconcile transactions to CSV instantly in the cloud</p>
+            <p class="subtitle">Extract and reconcile transactions instantly in the cloud</p>
+            <a href="/logout" id="logoutBtn" style="
+                position: absolute; top: 0; right: 0;
+                font-size: 0.78rem; font-weight: 600;
+                color: var(--text-muted);
+                background: rgba(255,255,255,0.04);
+                border: 1px solid var(--border-color);
+                border-radius: 20px;
+                padding: 6px 14px;
+                text-decoration: none;
+                transition: color 0.2s, background 0.2s;
+                display: flex; align-items: center; gap: 6px;
+            "
+            onmouseover="this.style.color='#ff5252';this.style.background='rgba(255,82,82,0.08)'"
+            onmouseout="this.style.color='var(--text-muted)';this.style.background='rgba(255,255,255,0.04)'">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Sign out
+            </a>
         </header>
 
         <div class="card">
