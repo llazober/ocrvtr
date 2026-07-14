@@ -990,7 +990,7 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
                         if match_chk:
                             date = match_chk.group(1)
                             chk_num = match_chk.group(2)
-                            amount = clean_amount(match_chk.group(3))
+                            amount = abs(clean_amount(match_chk.group(3)))
                             
                             current_tx = {
                                 'date': date,
@@ -1015,7 +1015,7 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
                     if match:
                         date = match.group(1)
                         desc = match.group(2).strip()
-                        amount = clean_amount(match.group(3))
+                        amount = abs(clean_amount(match.group(3)))
                         
                         current_tx = {
                             'date': date,
