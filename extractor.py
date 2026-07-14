@@ -401,17 +401,22 @@ def detect_bank(p1_words):
     return 'PNC'
 
 def clean_amount(val_str):
-    val_str = val_str.strip()
     if not val_str:
         return None
-    val_str = re.sub(r'[^\d\,\.]', '', val_str)
-    if not val_str:
+    val_str = str(val_str).strip()
+    cleaned = re.sub(r'[^\d.,\-]', '', val_str)
+    if not cleaned:
         return None
-    if re.search(r',\d{2}$', val_str):
-        val_str = val_str[:-3] + '.' + val_str[-2:]
-    val_str = val_str.replace(',', '')
+    match = re.search(r'[.,](\d{1,2})$', cleaned)
+    if match:
+        decimal_part = match.group(1)
+        integer_part = cleaned[:-(len(decimal_part) + 1)]
+        integer_digits = re.sub(r'[^\d\-]', '', integer_part)
+        cleaned = integer_digits + '.' + decimal_part
+    else:
+        cleaned = re.sub(r'[^\d\-]', '', cleaned)
     try:
-        return float(val_str)
+        return float(cleaned)
     except:
         return None
 
@@ -485,10 +490,10 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
             if avg_y >= 400:
                 continue
                 
-            matches = re.findall(r'\b\d{1,3}(?:,\d{3})*\.\d{2}\b', line_text)
+            matches = re.findall(r'\b\d{1,3}(?:[.,]\d{3})*[.,]\d{2}\b', line_text)
             if not matches:
                 continue
-            amount = float(matches[-1].replace(',', ''))
+            amount = clean_amount(matches[-1])
             
             lower_txt = line_text.lower()
             if 'beginning balance' in lower_txt:
