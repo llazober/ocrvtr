@@ -125,19 +125,47 @@ async def process_pdf(
 async def health_check():
     import json as _json
     status = {"status": "ok", "credentials": None, "error": None}
+    
+    # 1. Check GOOGLE_CREDENTIALS_JSON
     creds_raw = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
-    if not creds_raw:
-        status["credentials"] = "MISSING"
-        status["status"] = "error"
-    else:
+    if creds_raw:
         creds_stripped = creds_raw.strip().strip('"\'')
         try:
             info = _json.loads(creds_stripped)
-            status["credentials"] = f"OK — project_id={info.get('project_id')}, client_email={info.get('client_email')}"
+            status["credentials"] = f"GOOGLE_CREDENTIALS_JSON: OK — project_id={info.get('project_id')}, client_email={info.get('client_email')}"
+            return status
         except Exception as e:
-            status["credentials"] = "INVALID JSON"
+            status["credentials"] = "GOOGLE_CREDENTIALS_JSON: INVALID JSON"
             status["error"] = str(e)
             status["status"] = "error"
+            
+    # 2. Check GOOGLE_APPLICATION_CREDENTIALS file
+    env_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if env_path and os.path.exists(env_path):
+        status["status"] = "ok"
+        status["credentials"] = f"GOOGLE_APPLICATION_CREDENTIALS file exists: {env_path}"
+        status["error"] = None
+        return status
+
+    # 3. Check Fallbacks
+    fallback_paths = [
+        r"C:\keys\vision-keyvtr.json",
+        r"/keys/vision-keyvtr.json",
+        r"C:\keys\vision-key.json",
+        r"/keys/vision-key.json",
+    ]
+    for path in fallback_paths:
+        if os.path.exists(path):
+            status["status"] = "ok"
+            status["credentials"] = f"Fallback file exists: {path}"
+            status["error"] = None
+            return status
+
+    # If nothing is found
+    if not status["credentials"]:
+        status["credentials"] = "MISSING"
+        status["status"] = "error"
+        
     return status
 
 if __name__ == "__main__":
