@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Statement OCR Extractor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --card-bg: rgba(22, 26, 37, 0.65);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary-grad: linear-gradient(135deg, #7f00ff, #e100ff);
+            --secondary-grad: linear-gradient(135deg, #00f2fe, #4facfe);
+            --text-main: #f5f6fa;
+            --text-muted: #8b9bb4;
+            --accent-glow: rgba(225, 0, 255, 0.15);
+            --error-color: #ff5252;
+            --success-color: #00e676;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(127, 0, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(0, 242, 254, 0.05) 0%, transparent 40%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 650px;
+            text-align: center;
+            z-index: 10;
+        }
+
+        header {
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 2.8rem;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #ffffff 30%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+
+        /* Glassmorphic Card */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 
+                        0 0 50px rgba(127, 0, 255, 0.03);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+            border-radius: 24px 24px 0 0;
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 50px 20px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            background: rgba(255, 255, 255, 0.01);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: #e100ff;
+            background: rgba(127, 0, 255, 0.03);
+            box-shadow: inset 0 0 20px rgba(127, 0, 255, 0.05);
+        }
+
+        .drop-zone.drag-over {
+            transform: scale(0.99);
+        }
+
+        .icon-container {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone:hover .icon-container, .drop-zone.drag-over .icon-container {
+            background: var(--primary-grad);
+            box-shadow: 0 0 20px rgba(225, 0, 255, 0.35);
+            transform: translateY(-5px);
+            border-color: transparent;
+        }
+
+        .icon-container svg {
+            width: 36px;
+            height: 36px;
+            fill: none;
+            stroke: var(--text-main);
+            stroke-width: 1.5;
+            transition: stroke 0.3s ease;
+        }
+
+        .drop-zone:hover .icon-container svg, .drop-zone.drag-over .icon-container svg {
+            stroke: #fff;
+        }
+
+        .drop-zone-text h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .drop-zone-text p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* File Info Box */
+        .file-info-box {
+            display: none;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 24px;
+            align-items: center;
+            justify-content: space-between;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .file-details {
+            display: flex;
+            align-items: center;
+            text-align: left;
+        }
+
+        .file-icon {
+            margin-right: 12px;
+            color: #ff5252; /* PDF red */
+        }
+
+        .file-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-size {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .remove-file {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        .remove-file:hover {
+            color: var(--error-color);
+            background: rgba(255, 82, 82, 0.1);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 16px 32px;
+            margin-top: 24px;
+            border: none;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            color: #fff;
+            background: var(--primary-grad);
+            box-shadow: 0 4px 15px rgba(127, 0, 255, 0.25);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(225, 0, 255, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn:disabled {
+            background: #2a2d36;
+            color: var(--text-muted);
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Loader Overlay */
+        .loading-state {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 0;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.05);
+            border-top: 4px solid #e100ff;
+            border-right: 4px solid #7f00ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 24px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, #fff, var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .loading-subtext {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Alert Message */
+        .alert {
+            display: none;
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 24px;
+            font-size: 0.9rem;
+            text-align: left;
+            border: 1px solid transparent;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .alert-error {
+            background: rgba(255, 82, 82, 0.06);
+            border-color: rgba(255, 82, 82, 0.15);
+            color: #ff8a8a;
+        }
+
+        .alert-success {
+            background: rgba(0, 230, 118, 0.06);
+            border-color: rgba(0, 230, 118, 0.15);
+            color: #b9ffd9;
+        }
+
+        footer {
+            margin-top: 40px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Bank Statement Extractor</h1>
+            <p class="subtitle">Extract and reconcile transactions to CSV instantly in the cloud</p>
+        </header>
+
+        <div class="card">
+            <!-- Normal Upload Form -->
+            <div id="uploadFormContainer">
+                <div class="drop-zone" id="dropZone">
+                    <input type="file" id="fileInput" accept=".pdf">
+                    <div class="icon-container">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 5V19M12 5L6 11M12 5L18 11" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="drop-zone-text">
+                        <h3>Drag & Drop statement PDF</h3>
+                        <p>or click to browse your files</p>
+                    </div>
+                </div>
+
+                <div class="file-info-box" id="fileInfoBox">
+                    <div class="file-details">
+                        <div class="file-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9.5 6H8v5H6.5v-5H5V7.5h4.5V9zm5 5H12v-6.5h2.5c.8 0 1.5.7 1.5 1.5v3.5c0 .8-.7 1.5-1.5 1.5zm-1.5-5v3.5h1v-3.5h-1zm7.5 1.5h-3v1h2v1.5h-2V14H18v-6.5h4.5V9z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="file-name" id="fileName">Statement.pdf</div>
+                            <div class="file-size" id="fileSize">0 KB</div>
+                        </div>
+                    </div>
+                    <button class="remove-file" id="removeFileBtn" title="Remove file">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <button class="btn" id="processBtn" disabled>Process Statement</button>
+            </div>
+
+            <!-- Loader State -->
+            <div class="loading-state" id="loadingState">
+                <div class="spinner"></div>
+                <div class="loading-text">Extracting Statement...</div>
+                <div class="loading-subtext">Executing OCR and matching transactions (usually takes 30-90s)</div>
+            </div>
+
+            <!-- Results State -->
+            <div id="resultsContainer" style="display: none;">
+                <!-- Header with bank/business info -->
+                <div class="results-header" style="margin-bottom: 24px; text-align: left; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                    <h2 id="resultBusinessName" style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Business Name</h2>
+                    <p id="resultBankType" style="color: var(--text-muted); font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Bank Type</p>
+                </div>
+                
+                <!-- Reconciliation Section -->
+                <div class="reconciliation-section" style="margin-bottom: 32px; text-align: left;">
+                    <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px; color: var(--text-main);">Mathematical Reconciliation</h3>
+                    <div id="reconciliationCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+                        <!-- Reconciliation Cards loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Transactions Section -->
+                <div class="transactions-section" style="text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main);">Transactions</h3>
+                            <span id="txCountBadge" style="background: rgba(225, 0, 255, 0.1); color: #e100ff; border: 1px solid rgba(225, 0, 255, 0.2); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600;">0 records</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn" id="downloadCsvBtn" style="padding: 8px 16px; font-size: 0.8rem; background: rgba(0, 230, 118, 0.08); border: 1px solid rgba(0, 230, 118, 0.2); color: var(--success-color); width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">Download CSV</button>
+                            <button class="btn" id="downloadJsonBtn" style="padding: 8px 16px; font-size: 0.8rem; background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.2); color: #00f2fe; width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">Download JSON</button>
+                        </div>
+                    </div>
+                    <div style="overflow-y: auto; max-height: 450px; border: 1px solid var(--border-color); border-radius: 16px; background: rgba(0, 0, 0, 0.25); box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                            <thead style="position: sticky; top: 0; background: #141722; z-index: 10; box-shadow: 0 1px 0 var(--border-color);">
+                                <tr style="text-align: left;">
+                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Date</th>
+                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Check #</th>
+                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Description</th>
+                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-align: right;">Deposits</th>
+                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-align: right;">Withdrawals</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsTableBody">
+                                <!-- Loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Back button -->
+                <button class="btn" id="backToUploadBtn" style="margin-top: 32px; width: auto; padding: 12px 24px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 600;">← Upload Another Statement</button>
+            </div>
+
+            <!-- Alert Messaging -->
+            <div class="alert" id="alertBox"></div>
+        </div>
+
+        <footer>
+            &copy; 2026 Bank Statement OCR Extractor. All rights reserved.
+        </footer>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfoBox = document.getElementById('fileInfoBox');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const removeFileBtn = document.getElementById('removeFileBtn');
+        const processBtn = document.getElementById('processBtn');
+        const uploadFormContainer = document.getElementById('uploadFormContainer');
+        const loadingState = document.getElementById('loadingState');
+        const alertBox = document.getElementById('alertBox');
+
+        let selectedFile = null;
+
+        // Click on dropzone triggers file input
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // File Selection handling
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Drag & Drop event listeners
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('drag-over');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                showAlert('Please select a PDF file.', 'error');
+                return;
+            }
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = formatBytes(file.size);
+            
+            fileInfoBox.style.display = 'flex';
+            processBtn.disabled = false;
+            hideAlert();
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // Remove File click
+        removeFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectedFile = null;
+            fileInput.value = '';
+            fileInfoBox.style.display = 'none';
+            processBtn.disabled = true;
+            hideAlert();
+        });
+
+        // Submit click
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // Transition UI to loading
+            uploadFormContainer.style.display = 'none';
+            loadingState.style.display = 'flex';
+            hideAlert();
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.detail || `Server error (${response.status})`);
+                }
+
+                const result = await response.json();
+                currentResult = result;
+
+                // Populate and display results
+                document.getElementById('resultBusinessName').textContent = result.business_name || 'Business Name Not Detected';
+                document.getElementById('resultBankType').textContent = `Detected Bank: ${result.bank_type.replace('_', ' ')}`;
+
+                // Populate reconciliation cards
+                const reconContainer = document.getElementById('reconciliationCards');
+                reconContainer.innerHTML = '';
+                
+                result.reconciliation.forEach(item => {
+                    const isReconciled = Math.abs(item.Difference) < 0.01;
+                    const diffText = isReconciled 
+                        ? '✓ Reconciled (Diff: $0.00)' 
+                        : `✗ Discrepancy (Diff: $${item.Difference.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})})`;
+                    const statusColor = isReconciled ? 'var(--success-color)' : 'var(--error-color)';
+                    
+                    const card = document.createElement('div');
+                    card.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);';
+                    card.innerHTML = `
+                        <h4 style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">${item.Category}</h4>
+                        <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; font-family: 'Outfit', sans-serif;">$${item['Detail Sum'].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <div style="font-size: 0.85rem; color: ${statusColor}; font-weight: 600; display: flex; align-items: center;">${diffText}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Summary total: $${item['Summary Amount'].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${item['Items Count']} items)</div>
+                    `;
+                    reconContainer.appendChild(card);
+                });
+
+                // Populate transactions table
+                const tableBody = document.getElementById('transactionsTableBody');
+                tableBody.innerHTML = '';
+                
+                document.getElementById('txCountBadge').textContent = `${result.transactions.length} records`;
+
+                result.transactions.forEach(tx => {
+                    const tr = document.createElement('tr');
+                    tr.style.cssText = 'border-bottom: 1px solid rgba(255, 255, 255, 0.04); transition: background 0.2s ease;';
+                    tr.addEventListener('mouseenter', () => tr.style.background = 'rgba(255,255,255,0.02)');
+                    tr.addEventListener('mouseleave', () => tr.style.background = 'transparent');
+                    
+                    const checkNum = tx.checknumber !== null && tx.checknumber !== undefined && !isNaN(tx.checknumber) ? tx.checknumber : '';
+                    
+                    const formatAmt = (val) => {
+                        if (val === null || val === undefined || isNaN(val)) return '';
+                        return '$' + Number(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    };
+
+                    tr.innerHTML = `
+                        <td style="padding: 12px 16px; color: var(--text-main); font-weight: 500;">${tx.date}</td>
+                        <td style="padding: 12px 16px; color: var(--text-muted);">${checkNum}</td>
+                        <td style="padding: 12px 16px; color: var(--text-main); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${tx.description}">${tx.description}</td>
+                        <td style="padding: 12px 16px; color: var(--success-color); text-align: right; font-weight: 500;">${formatAmt(tx.Deposits)}</td>
+                        <td style="padding: 12px 16px; color: var(--error-color); text-align: right; font-weight: 500;">${formatAmt(tx.Withdrawals)}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+
+                // Transition UI to results
+                loadingState.style.display = 'none';
+                document.getElementById('resultsContainer').style.display = 'block';
+                // Update page container max-width to display table beautifully
+                document.querySelector('.container').style.maxWidth = '900px';
+
+            } catch (error) {
+                console.error(error);
+                showAlert(`Error processing statement: ${error.message}`, 'error');
+                // Return to normal form view on error
+                loadingState.style.display = 'none';
+                uploadFormContainer.style.display = 'block';
+            }
+        });
+
+        const backToUploadBtn = document.getElementById('backToUploadBtn');
+        const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+        const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+        let currentResult = null;
+
+        // Hover animations for download buttons
+        [downloadCsvBtn, downloadJsonBtn].forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                btn.style.transform = 'translateY(-1px)';
+                btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.transform = 'none';
+                btn.style.boxShadow = 'none';
+            });
+        });
+
+        downloadCsvBtn.addEventListener('click', () => {
+            if (!currentResult || !currentResult.transactions) return;
+            
+            const headers = ['date', 'checknumber', 'description', 'Deposits', 'Withdrawals'];
+            const csvRows = [headers.join(',')];
+            
+            currentResult.transactions.forEach(tx => {
+                const values = headers.map(header => {
+                    let val = tx[header];
+                    if (val === null || val === undefined) {
+                        return '';
+                    }
+                    val = String(val);
+                    if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                        val = `"${val.replace(/"/g, '""')}"`;
+                    }
+                    return val;
+                });
+                csvRows.push(values.join(','));
+            });
+            
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            
+            const filename = (currentResult.business_name ? currentResult.business_name.replace(/[^a-zA-Z0-9]/g, '_') : 'statement') + '.csv';
+            
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            link.setAttribute("download", filename);
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        });
+
+        downloadJsonBtn.addEventListener('click', () => {
+            if (!currentResult) return;
+            
+            const blob = new Blob([JSON.stringify(currentResult, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const filename = (currentResult.business_name ? currentResult.business_name.replace(/[^a-zA-Z0-9]/g, '_') : 'statement') + '.json';
+            
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            link.setAttribute("download", filename);
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        });
+
+        backToUploadBtn.addEventListener('click', () => {
+            // Reset selected file and state
+            selectedFile = null;
+            currentResult = null;
+            fileInput.value = '';
+            fileInfoBox.style.display = 'none';
+            processBtn.disabled = true;
+            hideAlert();
+
+            // Transition UI back to upload
+            document.getElementById('resultsContainer').style.display = 'none';
+            uploadFormContainer.style.display = 'block';
+            document.querySelector('.container').style.maxWidth = '650px';
+        });
+
+        function showAlert(message, type) {
+            alertBox.textContent = message;
+            alertBox.className = `alert alert-${type}`;
+            alertBox.style.display = 'block';
+        }
+
+        function hideAlert() {
+            alertBox.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

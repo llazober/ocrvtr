@@ -1,0 +1,8 @@
+pymupdf
+pandas
+google-cloud-vision
+google-auth
+fastapi
+uvicorn
+python-multipart
+jinja2
