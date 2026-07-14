@@ -22,6 +22,28 @@ def cleanup_temp_dir(path: str):
         except Exception as e:
             print(f"Failed to clean up temporary directory {path}: {e}")
 
+@app.get("/health")
+async def health_check():
+    """Debug endpoint — shows credential status without processing a file."""
+    import json as _json
+    status = {"status": "ok", "credentials": None, "error": None}
+    creds_raw = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
+    if not creds_raw:
+        status["credentials"] = "MISSING — GOOGLE_CREDENTIALS_JSON env var not set"
+        status["status"] = "error"
+    else:
+        creds_stripped = creds_raw.strip().strip('"\'')
+        status["credentials_length"] = len(creds_stripped)
+        status["credentials_first_20_chars"] = creds_stripped[:20]
+        try:
+            info = _json.loads(creds_stripped)
+            status["credentials"] = f"OK — project_id={info.get('project_id')}, client_email={info.get('client_email')}"
+        except Exception as e:
+            status["credentials"] = "INVALID JSON"
+            status["error"] = str(e)
+            status["status"] = "error"
+    return status
+
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")

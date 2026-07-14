@@ -14,19 +14,27 @@ CSV_OUTPUT = "Bank_Details.csv"
 def get_vision_client():
     creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     if creds_json:
+        # Strip surrounding whitespace or accidental wrapping quotes
+        creds_json = creds_json.strip().strip('"\'')
         try:
             info = json.loads(creds_json)
             credentials = service_account.Credentials.from_service_account_info(info)
-            print("--> Initialized Google Cloud Vision client using credentials from environment variable.")
+            print("--> Initialized Google Cloud Vision client using GOOGLE_CREDENTIALS_JSON env var.")
             return vision.ImageAnnotatorClient(credentials=credentials)
+        except json.JSONDecodeError as e:
+            print(f"ERROR: GOOGLE_CREDENTIALS_JSON is not valid JSON: {e}")
+            print(f"  First 200 chars of value: {creds_json[:200]}")
+            raise RuntimeError(f"GOOGLE_CREDENTIALS_JSON env var is not valid JSON: {e}")
         except Exception as e:
-            print(f"Warning: Failed to load credentials from GOOGLE_CREDENTIALS_JSON: {e}. Falling back to default detection.")
-    
-    # Fallback to local keys/env
+            print(f"ERROR: Failed to build Vision client from GOOGLE_CREDENTIALS_JSON: {e}")
+            raise RuntimeError(f"Failed to initialize Vision client from credentials: {e}")
+
+    # Fallback: local key file (development only)
     env_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     if env_path and os.path.exists(env_path):
+        print(f"--> Using GOOGLE_APPLICATION_CREDENTIALS file: {env_path}")
         return vision.ImageAnnotatorClient()
-        
+
     fallback_paths = [
         r"C:\keys\vision-keyvtr.json",
         r"/keys/vision-keyvtr.json",
@@ -36,12 +44,13 @@ def get_vision_client():
     for path in fallback_paths:
         if os.path.exists(path):
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = path
-            print(f"--> Set GOOGLE_APPLICATION_CREDENTIALS to existing file: {path}")
+            print(f"--> Set GOOGLE_APPLICATION_CREDENTIALS to: {path}")
             return vision.ImageAnnotatorClient()
-            
-    if not env_path:
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\keys\vision-keyvtr.json"
-    return vision.ImageAnnotatorClient()
+
+    raise RuntimeError(
+        "No Google credentials found. Set the GOOGLE_CREDENTIALS_JSON environment variable "
+        "with the full contents of your service account JSON key."
+    )
 
 def sanitize_filename(name):
     if not name:
