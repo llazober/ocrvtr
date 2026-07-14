@@ -1329,6 +1329,8 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
             if not val_lines: continue
             closest_val = min(val_lines, key=lambda v: abs(v[0] - lbl_y))
             val = clean_amount(closest_val[1])
+            if val is not None:
+                val = abs(val)
             if 'checks' in lbl_clean:
                 summary_totals['Checks'] = val
             elif 'other withdrawals' in lbl_clean:
