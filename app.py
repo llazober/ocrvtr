@@ -134,10 +134,15 @@ async def support_submit(
         raise HTTPException(status_code=401, detail="Not authenticated.")
 
     resend_key = os.environ.get("RESEND_API_KEY")
-    if not resend_key or not resend_key.strip() or not resend_key.startswith("re_"):
+    if resend_key:
+        resend_key = resend_key.strip().strip('\'"')
+    if not resend_key or not resend_key.startswith("re_"):
         resend_key = "re_LUvcnmLD_AMMTLePHQzmBFn9gV1wKCqra"
+
     from_email = os.environ.get("RESEND_FROM_EMAIL")
-    if not from_email or not from_email.strip() or "@" not in from_email:
+    if from_email:
+        from_email = from_email.strip().strip('\'"')
+    if not from_email or "@" not in from_email:
         from_email = "vrt@nelsonmar.com"
     to_email = "luislazo@datalazo.net"
     
