@@ -434,6 +434,19 @@
                     <p id="resultBankType" style="color: var(--text-muted); font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Bank Type</p>
                 </div>
                 
+                <!-- Warnings container -->
+                <div id="resultsWarnings" style="display: none; margin-bottom: 24px; text-align: left; padding: 16px; background: rgba(255, 171, 0, 0.08); border: 1px solid rgba(255, 171, 0, 0.3); border-radius: 8px; backdrop-filter: blur(10px);">
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="color: #ffab00; font-size: 1.5rem; line-height: 1;">⚠️</span>
+                        <div>
+                            <h4 style="margin: 0 0 6px 0; font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700; color: #ffab00;">Reconciliation Verification Warning</h4>
+                            <div id="resultsWarningsList" style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.5; font-family: 'Inter', sans-serif;">
+                                <!-- Warning messages will render here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Reconciliation Section -->
                 <div class="reconciliation-section" style="margin-bottom: 32px; text-align: left;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -775,6 +788,8 @@
             uploadFormContainer.style.display = 'none';
             loadingState.style.display = 'flex';
             hideAlert();
+            document.getElementById('resultsWarnings').style.display = 'none';
+            document.getElementById('resultsWarningsList').innerHTML = '';
 
             const formData = new FormData();
             formData.append('file', selectedFile);
@@ -805,6 +820,22 @@
                 }
 
                 document.getElementById('resultBankType').textContent = `Detected Bank: ${result.bank_type.replace('_', ' ')}`;
+
+                // Populate warnings if present
+                const warningsDiv = document.getElementById('resultsWarnings');
+                const warningsList = document.getElementById('resultsWarningsList');
+                warningsList.innerHTML = '';
+                if (result.warnings && result.warnings.length > 0) {
+                    result.warnings.forEach(warning => {
+                        const div = document.createElement('div');
+                        div.style.marginBottom = '6px';
+                        div.textContent = warning;
+                        warningsList.appendChild(div);
+                    });
+                    warningsDiv.style.display = 'block';
+                } else {
+                    warningsDiv.style.display = 'none';
+                }
 
                 // Populate reconciliation cards
                 const reconContainer = document.getElementById('reconciliationCards');

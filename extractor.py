@@ -457,6 +457,7 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
     summary_page = 1
     summary_totals = {}
     period = None
+    warnings = []
     
     for page_key in ['page_1', 'page_2']:
         p_words = all_pages_words.get(page_key, [])
@@ -672,6 +673,7 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
     if summary_dep == 0.0 and detail_dep != 0.0:
         print(f"Self-correcting Wells Fargo category 'Deposits/Credits': Summary was 0.0/None but Detail Sum was {detail_dep}")
         summary_dep = detail_dep
+        warnings.append(f"Verify the summary in bank statement. Best solution is to give a second pass the image again and tell to Google Vision to look for the Summary Box and try to extract the data, if still miss then apply the discrepancy patching with the Alert Message. Overwrote 'Deposits/Credits' summary with detail sum of ${detail_dep:,.2f}.")
     reconciliation.append({
         'Category': 'Deposits/Credits',
         'Summary Amount': summary_dep,
@@ -687,6 +689,7 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
     if summary_wit == 0.0 and detail_wit != 0.0:
         print(f"Self-correcting Wells Fargo category 'Withdrawals/Debits': Summary was 0.0/None but Detail Sum was {detail_wit}")
         summary_wit = detail_wit
+        warnings.append(f"Verify the summary in bank statement. Best solution is to give a second pass the image again and tell to Google Vision to look for the Summary Box and try to extract the data, if still miss then apply the discrepancy patching with the Alert Message. Overwrote 'Withdrawals/Debits' summary with detail sum of ${detail_wit:,.2f}.")
     reconciliation.append({
         'Category': 'Withdrawals/Debits',
         'Summary Amount': summary_wit,
@@ -710,7 +713,7 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print(f"WARNING: Total difference of ${total_diff:.2f}.")
         
-    return formatted_df, reconciliation, summary_page, period
+    return formatted_df, reconciliation, summary_page, period, warnings
 
 def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING PNC BANK PROCESSING ===")
@@ -728,6 +731,7 @@ def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
     
     summary_totals = {}
     period = None
+    warnings = []
     all_p1_lines = group_words_into_lines(p1_words, y_tol=8)
     for y, line in all_p1_lines:
         pnc_match = re.search(r'\bFor\s+the\s+Per[iodl1]{2,4}\s+(.*?)(?:\bPrimary\b|\bAccount\b|$)', line, re.IGNORECASE)
@@ -890,6 +894,7 @@ def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
         if sum_val == 0.0 and det_sum != 0.0:
             print(f"Self-correcting PNC category '{category}': Summary was 0.0/None but Detail Sum was {det_sum}")
             sum_val = det_sum
+            warnings.append(f"Verify the summary in bank statement. Best solution is to give a second pass the image again and tell to Google Vision to look for the Summary Box and try to extract the data, if still miss then apply the discrepancy patching with the Alert Message. Overwrote '{category}' summary with detail sum of ${det_sum:,.2f}.")
             
         diff = round(det_sum - sum_val, 2)
         reconciliation.append({
@@ -919,7 +924,7 @@ def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation, 1, period
+    return formatted_df, reconciliation, 1, period, warnings
 
 def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING BANK OF AMERICA PROCESSING ===")
@@ -943,6 +948,7 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
                 period = 'For ' + line_clean[4:].strip()
                 break
 
+    warnings = []
     summary_totals = {
         'Deposits and other credits': 0.0,
         'Withdrawals and other debits': 0.0,
@@ -1118,6 +1124,7 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
         if sum_val == 0.0 and det_sum != 0.0:
             print(f"Self-correcting BOA category '{category}': Summary was 0.0/None but Detail Sum was {det_sum}")
             sum_val = det_sum
+            warnings.append(f"Verify the summary in bank statement. Best solution is to give a second pass the image again and tell to Google Vision to look for the Summary Box and try to extract the data, if still miss then apply the discrepancy patching with the Alert Message. Overwrote '{category}' summary with detail sum of ${det_sum:,.2f}.")
             
         diff = round(det_sum - sum_val, 2)
         reconciliation.append({
@@ -1147,7 +1154,7 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation, 1, period
+    return formatted_df, reconciliation, 1, period, warnings
 
 def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING TD BANK PROCESSING ===")
@@ -1191,6 +1198,7 @@ def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
 
     left_p1 = [w for w in p1_words if w['center_x'] < 600 and w['center_y'] < 800]
     left_p1_lines = group_words_into_lines(left_p1, y_tol=8)
+    warnings = []
     summary_totals = {
         'Electronic Deposits': 0.0,
         'Electronic Payments': 0.0,
@@ -1328,6 +1336,7 @@ def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
         if sum_val == 0.0 and det_sum != 0.0:
             print(f"Self-correcting TD category '{category}': Summary was 0.0/None but Detail Sum was {det_sum}")
             sum_val = det_sum
+            warnings.append(f"Verify the summary in bank statement. Best solution is to give a second pass the image again and tell to Google Vision to look for the Summary Box and try to extract the data, if still miss then apply the discrepancy patching with the Alert Message. Overwrote '{category}' summary with detail sum of ${det_sum:,.2f}.")
             
         diff = round(det_sum - sum_val, 2)
         reconciliation.append({
@@ -1357,7 +1366,7 @@ def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation, 1, period
+    return formatted_df, reconciliation, 1, period, warnings
 
 def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING TRUIST BANK PROCESSING ===")
@@ -1386,6 +1395,7 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
     left_lines = group_words_into_lines(left_words, y_tol=8)
     right_lines = group_words_into_lines(right_words, y_tol=8)
     
+    warnings = []
     period = None
     all_p1_lines = group_words_into_lines(p1_words, y_tol=8)
     for y, line in all_p1_lines:
@@ -1576,6 +1586,7 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
         if sum_val == 0.0 and det_sum != 0.0:
             print(f"Self-correcting Truist category '{category}': Summary was 0.0/None but Detail Sum was {det_sum}")
             sum_val = det_sum
+            warnings.append(f"Verify the summary in bank statement. Best solution is to give a second pass the image again and tell to Google Vision to look for the Summary Box and try to extract the data, if still miss then apply the discrepancy patching with the Alert Message. Overwrote '{category}' summary with detail sum of ${det_sum:,.2f}.")
             
         diff = round(det_sum - sum_val, 2)
         reconciliation.append({
@@ -1605,7 +1616,7 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation, 1, period
+    return formatted_df, reconciliation, 1, period, warnings
 
 def run_extraction(pdf_path, temp_dir, create_csv=False):
     convert_pdf_to_png(pdf_path, temp_dir)
@@ -1641,15 +1652,15 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
         all_pages_words[page_name] = words
         
     if bank_type == 'WELLS_FARGO':
-        formatted_df, reconciliation, summary_page, period = run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period, warnings = run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output_path)
     elif bank_type == 'BANK_OF_AMERICA':
-        formatted_df, reconciliation, summary_page, period = run_boa_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period, warnings = run_boa_pipeline(all_pages_words, pdf_path, csv_output_path)
     elif bank_type == 'TD_BANK':
-        formatted_df, reconciliation, summary_page, period = run_td_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period, warnings = run_td_pipeline(all_pages_words, pdf_path, csv_output_path)
     elif bank_type == 'TRUIST':
-        formatted_df, reconciliation, summary_page, period = run_truist_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period, warnings = run_truist_pipeline(all_pages_words, pdf_path, csv_output_path)
     else:
-        formatted_df, reconciliation, summary_page, period = run_pnc_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period, warnings = run_pnc_pipeline(all_pages_words, pdf_path, csv_output_path)
         
     import base64
     summary_img_path = os.path.join(temp_dir, f"page_{summary_page}.png")
@@ -1667,5 +1678,6 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
         "transactions": clean_df.to_dict(orient='records'),
         "reconciliation": reconciliation,
         "summary_page": summary_page,
-        "summary_page_image": summary_page_image_b64
+        "summary_page_image": summary_page_image_b64,
+        "warnings": warnings
     }
