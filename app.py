@@ -137,7 +137,10 @@ async def support_submit(
     if resend_key:
         resend_key = resend_key.strip().strip('\'"')
     if not resend_key or not resend_key.startswith("re_"):
-        resend_key = "re_LUvcnmLD_AMMTLePHQzmBFn9gV1wKCqra"
+        raise HTTPException(
+            status_code=500,
+            detail="Support email feature is not configured: RESEND_API_KEY environment variable is missing or invalid on the server. Please add your Resend API Key in Easypanel environment variables."
+        )
 
     from_email = os.environ.get("RESEND_FROM_EMAIL")
     if from_email:
@@ -174,48 +177,29 @@ async def support_submit(
     if attachments:
         payload["attachments"] = attachments
         
-    known_good_key = "re_LUvcnmLD_AMMTLePHQzmBFn9gV1wKCqra"
-
-    def send_attempt(key_val):
-        req = urllib.request.Request(
-            "https://api.resend.com/emails",
-            data=json.dumps(payload).encode('utf-8'),
-            headers={
-                "Authorization": f"Bearer {key_val}",
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req) as response:
-            return response.read().decode('utf-8')
-
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode('utf-8'),
+        headers={
+            "Authorization": f"Bearer {resend_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
+        method="POST"
+    )
+    
     try:
-        res_body = send_attempt(resend_key)
-        print(f"Resend email sent successfully: {res_body}")
-        return {"status": "success", "message": "Support email sent successfully."}
+        with urllib.request.urlopen(req) as response:
+            res_body = response.read().decode('utf-8')
+            print(f"Resend email sent successfully: {res_body}")
+            return {"status": "success", "message": "Support email sent successfully."}
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8')
         print(f"Failed to send email via Resend: Code {e.code}, Response: {err_body}")
         
         env_raw = os.environ.get("RESEND_API_KEY", "")
         masked_env = f"{env_raw[:6]}...{env_raw[-4:]}" if len(env_raw) > 10 else env_raw
-        masked_used = f"{resend_key[:6]}...{resend_key[-4:]}" if len(resend_key) > 10 else resend_key
-        
-        if (e.code in (401, 403)) and resend_key != known_good_key:
-            print("API key from environment failed. Retrying with fallback key...")
-            try:
-                res_body = send_attempt(known_good_key)
-                print(f"Resend email sent successfully with fallback key: {res_body}")
-                return {"status": "success", "message": "Support email sent successfully using fallback key."}
-            except urllib.error.HTTPError as retry_e:
-                retry_err_body = retry_e.read().decode('utf-8')
-                print(f"Fallback key also failed: Code {retry_e.code}, Response: {retry_err_body}")
-                raise HTTPException(status_code=500, detail=f"Failed to send support email (Fallback failed): {retry_err_body}. Used fallback: re_LUvc...qra")
-            except Exception as retry_e:
-                print(f"Fallback key failed: {str(retry_e)}")
-                raise HTTPException(status_code=500, detail=f"Failed to send support email (Fallback failed exception): {str(retry_e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to send support email: {err_body}. Used Key: {masked_used}, Raw Env Key: {masked_env}, From: {from_email}")
+        raise HTTPException(status_code=500, detail=f"Failed to send support email: {err_body}. Raw Env Key: {masked_env}, From: {from_email}")
     except Exception as e:
         print(f"Error occurred while sending email: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error sending email: {str(e)}")
