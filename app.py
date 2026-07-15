@@ -192,6 +192,11 @@ async def support_submit(
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8')
         print(f"Failed to send email via Resend: Code {e.code}, Response: {err_body}")
+        
+        env_raw = os.environ.get("RESEND_API_KEY", "")
+        masked_env = f"{env_raw[:6]}...{env_raw[-4:]}" if len(env_raw) > 10 else env_raw
+        masked_used = f"{resend_key[:6]}...{resend_key[-4:]}" if len(resend_key) > 10 else resend_key
+        
         if (e.code in (401, 403)) and resend_key != known_good_key:
             print("API key from environment failed. Retrying with fallback key...")
             try:
@@ -201,11 +206,11 @@ async def support_submit(
             except urllib.error.HTTPError as retry_e:
                 retry_err_body = retry_e.read().decode('utf-8')
                 print(f"Fallback key also failed: Code {retry_e.code}, Response: {retry_err_body}")
-                raise HTTPException(status_code=500, detail=f"Failed to send support email: {retry_err_body}")
+                raise HTTPException(status_code=500, detail=f"Failed to send support email (Fallback failed): {retry_err_body}. Used fallback: re_LUvc...qra")
             except Exception as retry_e:
                 print(f"Fallback key failed: {str(retry_e)}")
-                raise HTTPException(status_code=500, detail=f"Failed to send support email: {str(retry_e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to send support email: {err_body}")
+                raise HTTPException(status_code=500, detail=f"Failed to send support email (Fallback failed exception): {str(retry_e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to send support email: {err_body}. Used Key: {masked_used}, Raw Env Key: {masked_env}, From: {from_email}")
     except Exception as e:
         print(f"Error occurred while sending email: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error sending email: {str(e)}")
