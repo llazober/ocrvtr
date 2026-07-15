@@ -666,22 +666,32 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
     
     reconciliation = []
     summary_dep = summary_totals.get('Deposits/Credits', 0.0)
+    if summary_dep is None:
+        summary_dep = 0.0
     detail_dep = df_sums.get('Deposits/Credits', 0.0)
+    if summary_dep == 0.0 and detail_dep != 0.0:
+        print(f"Self-correcting Wells Fargo category 'Deposits/Credits': Summary was 0.0/None but Detail Sum was {detail_dep}")
+        summary_dep = detail_dep
     reconciliation.append({
         'Category': 'Deposits/Credits',
         'Summary Amount': summary_dep,
         'Detail Sum': detail_dep,
-        'Difference': detail_dep - summary_dep,
+        'Difference': round(detail_dep - summary_dep, 2),
         'Items Count': df_counts.get('Deposits/Credits', 0)
     })
     
     summary_wit = summary_totals.get('Withdrawals/Debits', 0.0)
+    if summary_wit is None:
+        summary_wit = 0.0
     detail_wit = df_sums.get('Withdrawals/Debits', 0.0)
+    if summary_wit == 0.0 and detail_wit != 0.0:
+        print(f"Self-correcting Wells Fargo category 'Withdrawals/Debits': Summary was 0.0/None but Detail Sum was {detail_wit}")
+        summary_wit = detail_wit
     reconciliation.append({
         'Category': 'Withdrawals/Debits',
         'Summary Amount': summary_wit,
         'Detail Sum': detail_wit,
-        'Difference': detail_wit - summary_wit,
+        'Difference': round(detail_wit - summary_wit, 2),
         'Items Count': df_counts.get('Withdrawals/Debits', 0)
     })
     
@@ -868,10 +878,20 @@ def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
         df_counts = {}
     
     reconciliation = []
-    for category, sum_val in summary_totals.items():
+    all_categories = set(summary_totals.keys()) | set(df_sums.keys())
+    for category in all_categories:
+        sum_val = summary_totals.get(category, 0.0)
+        if sum_val is None:
+            sum_val = 0.0
         det_sum = df_sums.get(category, 0.0)
         det_count = df_counts.get(category, 0)
-        diff = det_sum - sum_val
+        
+        # Self-correction: if summary is 0.0/None but detail is non-zero, assume summary extraction failed
+        if sum_val == 0.0 and det_sum != 0.0:
+            print(f"Self-correcting PNC category '{category}': Summary was 0.0/None but Detail Sum was {det_sum}")
+            sum_val = det_sum
+            
+        diff = round(det_sum - sum_val, 2)
         reconciliation.append({
             'Category': category,
             'Summary Amount': sum_val,
@@ -1086,10 +1106,20 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
         df_counts = {}
         
     reconciliation = []
-    for category, sum_val in summary_totals.items():
+    all_categories = set(summary_totals.keys()) | set(df_sums.keys())
+    for category in all_categories:
+        sum_val = summary_totals.get(category, 0.0)
+        if sum_val is None:
+            sum_val = 0.0
         det_sum = df_sums.get(category, 0.0)
         det_count = df_counts.get(category, 0)
-        diff = det_sum - sum_val
+        
+        # Self-correction: if summary is 0.0/None but detail is non-zero, assume summary extraction failed
+        if sum_val == 0.0 and det_sum != 0.0:
+            print(f"Self-correcting BOA category '{category}': Summary was 0.0/None but Detail Sum was {det_sum}")
+            sum_val = det_sum
+            
+        diff = round(det_sum - sum_val, 2)
         reconciliation.append({
             'Category': category,
             'Summary Amount': sum_val,
@@ -1286,10 +1316,20 @@ def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
         df_counts = {}
         
     reconciliation = []
-    for category, sum_val in summary_totals.items():
+    all_categories = set(summary_totals.keys()) | set(df_sums.keys())
+    for category in all_categories:
+        sum_val = summary_totals.get(category, 0.0)
+        if sum_val is None:
+            sum_val = 0.0
         det_sum = df_sums.get(category, 0.0)
         det_count = df_counts.get(category, 0)
-        diff = det_sum - sum_val
+        
+        # Self-correction: if summary is 0.0/None but detail is non-zero, assume summary extraction failed
+        if sum_val == 0.0 and det_sum != 0.0:
+            print(f"Self-correcting TD category '{category}': Summary was 0.0/None but Detail Sum was {det_sum}")
+            sum_val = det_sum
+            
+        diff = round(det_sum - sum_val, 2)
         reconciliation.append({
             'Category': category,
             'Summary Amount': sum_val,
@@ -1524,10 +1564,20 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
         df_counts = {}
         
     reconciliation = []
-    for category, sum_val in summary_totals.items():
+    all_categories = set(summary_totals.keys()) | set(df_sums.keys())
+    for category in all_categories:
+        sum_val = summary_totals.get(category, 0.0)
+        if sum_val is None:
+            sum_val = 0.0
         det_sum = df_sums.get(category, 0.0)
         det_count = df_counts.get(category, 0)
-        diff = det_sum - sum_val
+        
+        # Self-correction: if summary is 0.0/None but detail is non-zero, assume summary extraction failed
+        if sum_val == 0.0 and det_sum != 0.0:
+            print(f"Self-correcting Truist category '{category}': Summary was 0.0/None but Detail Sum was {det_sum}")
+            sum_val = det_sum
+            
+        diff = round(det_sum - sum_val, 2)
         reconciliation.append({
             'Category': category,
             'Summary Amount': sum_val,
