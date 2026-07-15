@@ -2,6 +2,10 @@ import os
 import secrets
 import shutil
 import tempfile
+import base64
+import json
+import urllib.request
+import urllib.error
 from fastapi import FastAPI, File, UploadFile, BackgroundTasks, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -119,6 +123,71 @@ async def process_pdf(
     except Exception as e:
         cleanup_temp_dir(temp_dir)
         raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
+
+@app.post("/support")
+async def support_submit(
+    request: Request,
+    message: str = Form(...),
+    file: UploadFile = File(None)
+):
+    if not get_current_session(request):
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    resend_key = os.environ.get("RESEND_API_KEY", "re_LUvcnmLD_AMMTLePHQzmBFn9gV1wKCqra")
+    from_email = os.environ.get("RESEND_FROM_EMAIL", "vrt@nelsonmar.com")
+    to_email = "luislazo@datalazo.net"
+    
+    subject = "Support Request - Bank Statement OCR Extractor"
+    
+    html_content = f"""
+    <h3>Support Request</h3>
+    <p><strong>User:</strong> {APP_USERNAME}</p>
+    <p><strong>Message:</strong></p>
+    <p>{message.replace(chr(10), '<br>')}</p>
+    """
+    
+    attachments = []
+    if file and file.filename:
+        file_bytes = await file.read()
+        if len(file_bytes) > 0:
+            b64_content = base64.b64encode(file_bytes).decode('utf-8')
+            attachments.append({
+                "filename": file.filename,
+                "content": b64_content
+            })
+            
+    payload = {
+        "from": from_email,
+        "to": [to_email],
+        "subject": subject,
+        "html": html_content
+    }
+    if attachments:
+        payload["attachments"] = attachments
+        
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode('utf-8'),
+        headers={
+            "Authorization": f"Bearer {resend_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
+        method="POST"
+    )
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            res_body = response.read().decode('utf-8')
+            print(f"Resend email sent successfully: {res_body}")
+            return {"status": "success", "message": "Support email sent successfully."}
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8')
+        print(f"Failed to send email via Resend: Code {e.code}, Response: {err_body}")
+        raise HTTPException(status_code=500, detail=f"Failed to send support email: {err_body}")
+    except Exception as e:
+        print(f"Error occurred while sending email: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error sending email: {str(e)}")
 
 # ── Health / debug ─────────────────────────────────────────────────────────────
 @app.get("/health")

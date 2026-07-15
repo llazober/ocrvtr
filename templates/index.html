@@ -338,6 +338,26 @@
         <header style="position: relative;">
             <h1>Bank Statement Extractor</h1>
             <p class="subtitle">Extract and reconcile transactions instantly in the cloud</p>
+            <button id="supportBtn" style="
+                position: absolute; top: 0; right: 105px;
+                font-size: 0.78rem; font-weight: 600;
+                color: var(--text-muted);
+                background: rgba(255,255,255,0.04);
+                border: 1px solid var(--border-color);
+                border-radius: 20px;
+                padding: 6px 14px;
+                text-decoration: none;
+                transition: color 0.2s, background 0.2s;
+                display: flex; align-items: center; gap: 6px;
+                cursor: pointer;
+            "
+            onmouseover="this.style.color='#00f2fe';this.style.background='rgba(0,242,254,0.08)'"
+            onmouseout="this.style.color='var(--text-muted)';this.style.background='rgba(255,255,255,0.04)'">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Support
+            </button>
             <a href="/logout" id="logoutBtn" style="
                 position: absolute; top: 0; right: 0;
                 font-size: 0.78rem; font-weight: 600;
@@ -548,6 +568,118 @@
                     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                     border: 1px solid var(--border-color);
                 ">
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for support request -->
+    <div id="supportModal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    ">
+        <div style="
+            background: #141722;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            max-width: 90%;
+            max-height: 90%;
+            width: 500px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            position: relative;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        " id="supportModalContent">
+            <!-- Modal Header -->
+            <div style="
+                padding: 16px 24px;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main);">Send Support Request</h3>
+                <button id="closeSupportModalBtn" style="
+                    background: transparent;
+                    border: none;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    padding: 4px;
+                    border-radius: 50%;
+                    transition: all 0.2s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <!-- Modal Body (Form Container) -->
+            <div style="
+                padding: 24px;
+                background: #0b0c10;
+                border-radius: 0 0 20px 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+            ">
+                <div>
+                    <label style="display: block; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">MESSAGE</label>
+                    <textarea id="supportMessage" placeholder="Describe the issue or request here..." style="
+                        width: 100%;
+                        height: 150px;
+                        background: rgba(255,255,255,0.03);
+                        border: 1px solid var(--border-color);
+                        border-radius: 12px;
+                        padding: 12px;
+                        color: var(--text-main);
+                        font-family: inherit;
+                        font-size: 0.9rem;
+                        resize: none;
+                        outline: none;
+                        transition: border-color 0.2s;
+                    " onfocus="this.style.borderColor='#00f2fe'" onblur="this.style.borderColor='var(--border-color)'"></textarea>
+                </div>
+                
+                <div>
+                    <label style="display: block; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">ATTACH FILE (OPTIONAL)</label>
+                    <div id="supportAttachmentArea" style="
+                        border: 1.5px dashed rgba(255, 255, 255, 0.15);
+                        border-radius: 12px;
+                        padding: 20px;
+                        text-align: center;
+                        cursor: pointer;
+                        background: rgba(255, 255, 255, 0.01);
+                        transition: all 0.2s;
+                    " onmouseover="this.style.borderColor='#00f2fe';this.style.background='rgba(0,242,254,0.02)'" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.15)';this.style.background='rgba(255, 255, 255, 0.01)'">
+                        <input type="file" id="supportFileInput" style="display: none;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="margin: 0 auto 8px;">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span id="supportFileText" style="font-size: 0.85rem; color: var(--text-muted);">Choose a file or drag it here</span>
+                    </div>
+                </div>
+                
+                <button class="btn" id="sendSupportBtn" style="
+                    margin-top: 12px;
+                    background: var(--secondary-grad);
+                    box-shadow: 0 4px 15px rgba(0, 242, 254, 0.25);
+                ">Send Email</button>
             </div>
         </div>
     </div>
@@ -915,6 +1047,129 @@
         viewSummaryPageBtn.addEventListener('mouseleave', () => {
             viewSummaryPageBtn.style.transform = 'none';
             viewSummaryPageBtn.style.boxShadow = 'none';
+        });
+
+        // --- Support Modal Logic ---
+        const supportBtn = document.getElementById('supportBtn');
+        const supportModal = document.getElementById('supportModal');
+        const supportModalContent = document.getElementById('supportModalContent');
+        const closeSupportModalBtn = document.getElementById('closeSupportModalBtn');
+        const supportMessage = document.getElementById('supportMessage');
+        const supportFileInput = document.getElementById('supportFileInput');
+        const supportAttachmentArea = document.getElementById('supportAttachmentArea');
+        const supportFileText = document.getElementById('supportFileText');
+        const sendSupportBtn = document.getElementById('sendSupportBtn');
+
+        let supportAttachedFile = null;
+
+        supportBtn.addEventListener('click', () => {
+            // Reset modal state
+            supportMessage.value = '';
+            supportAttachedFile = null;
+            supportFileInput.value = '';
+            supportFileText.textContent = 'Choose a file or drag it here';
+            supportFileText.style.color = 'var(--text-muted)';
+            
+            // Show modal
+            supportModal.style.display = 'flex';
+            supportModal.offsetHeight; // force reflow
+            supportModal.style.opacity = '1';
+            supportModalContent.style.transform = 'scale(1)';
+        });
+
+        function closeSupportModal() {
+            supportModal.style.opacity = '0';
+            supportModalContent.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                supportModal.style.display = 'none';
+            }, 300);
+        }
+
+        closeSupportModalBtn.addEventListener('click', closeSupportModal);
+        supportModal.addEventListener('click', (e) => {
+            if (e.target === supportModal) {
+                closeSupportModal();
+            }
+        });
+
+        // Trigger file selection when clicking attachment area
+        supportAttachmentArea.addEventListener('click', () => supportFileInput.click());
+
+        // File selection handler
+        supportFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleSupportFile(e.target.files[0]);
+            }
+        });
+
+        // Drag & Drop for support attachment
+        ['dragenter', 'dragover'].forEach(eventName => {
+            supportAttachmentArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                supportAttachmentArea.style.borderColor = '#00f2fe';
+                supportAttachmentArea.style.background = 'rgba(0,242,254,0.04)';
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            supportAttachmentArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                supportAttachmentArea.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                supportAttachmentArea.style.background = 'rgba(255, 255, 255, 0.01)';
+            }, false);
+        });
+
+        supportAttachmentArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt.files.length > 0) {
+                handleSupportFile(dt.files[0]);
+            }
+        });
+
+        function handleSupportFile(file) {
+            supportAttachedFile = file;
+            supportFileText.textContent = file.name + ' (' + formatBytes(file.size) + ')';
+            supportFileText.style.color = '#00f2fe';
+        }
+
+        // Send Support Email
+        sendSupportBtn.addEventListener('click', async () => {
+            const msgVal = supportMessage.value.trim();
+            if (!msgVal) {
+                alert('Please enter a message.');
+                return;
+            }
+
+            sendSupportBtn.disabled = true;
+            sendSupportBtn.textContent = 'Sending...';
+
+            const formData = new FormData();
+            formData.append('message', msgVal);
+            if (supportAttachedFile) {
+                formData.append('file', supportAttachedFile);
+            }
+
+            try {
+                const response = await fetch('/support', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    alert('Support email sent successfully!');
+                    closeSupportModal();
+                } else {
+                    const errText = await response.text();
+                    alert('Failed to send support email: ' + errText);
+                }
+            } catch (error) {
+                alert('Error sending support email: ' + error.message);
+            } finally {
+                sendSupportBtn.disabled = false;
+                sendSupportBtn.textContent = 'Send Email';
+            }
         });
     </script>
 </body>
