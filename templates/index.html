@@ -933,6 +933,9 @@
                         return '';
                     }
                     val = String(val);
+                    if (header === 'description' && val.length >= 99) {
+                        val = val.substring(0, 98);
+                    }
                     if (val.includes(',') || val.includes('"') || val.includes('\n')) {
                         val = `"${val.replace(/"/g, '""')}"`;
                     }

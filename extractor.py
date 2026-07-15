@@ -344,7 +344,11 @@ def save_dataframe_to_csv(df, filepath):
     if dir_path:
         os.makedirs(dir_path, exist_ok=True)
         
-    df.to_csv(filepath, index=False, encoding='utf-8')
+    df_copy = df.copy()
+    if 'description' in df_copy.columns:
+        df_copy['description'] = df_copy['description'].apply(lambda x: str(x)[:98] if pd.notnull(x) else x)
+        
+    df_copy.to_csv(filepath, index=False, encoding='utf-8')
     print(f"--> Consolidated transactions successfully exported to '{filepath}' ({len(df)} records)")
 
 def format_df_to_standard_columns(df):
