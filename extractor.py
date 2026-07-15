@@ -456,6 +456,7 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
             
     summary_page = 1
     summary_totals = {}
+    period = None
     
     for page_key in ['page_1', 'page_2']:
         p_words = all_pages_words.get(page_key, [])
@@ -508,6 +509,17 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
         if 'Beginning Balance' in temp_summary or 'Ending Balance' in temp_summary:
             summary_totals = temp_summary
             summary_page = int(page_key.split('_')[1])
+            
+            # Find period from the summary page lines
+            for line in sorted(p_lines, key=lambda l: sum(w['center_y'] for w in l)/len(l)):
+                sorted_line = sorted(line, key=lambda w: w['center_x'])
+                line_text = ' '.join(w['text'] for w in sorted_line)
+                if 'ending balance' in line_text.lower():
+                    wf_match = re.search(r'(ending\s+balance\s+on\s+[^$]+)', line_text, re.IGNORECASE)
+                    if wf_match:
+                        period = wf_match.group(1).strip()
+                    else:
+                        period = "Ending Balance"
             break
             
     print(f"\n=== WELLS FARGO REPORT SUMMARY (PAGE {summary_page}) ===")
@@ -688,7 +700,7 @@ def run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print(f"WARNING: Total difference of ${total_diff:.2f}.")
         
-    return formatted_df, reconciliation, summary_page
+    return formatted_df, reconciliation, summary_page, period
 
 def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING PNC BANK PROCESSING ===")
@@ -705,6 +717,13 @@ def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
     right_p1_lines = group_words_into_lines(right_p1, y_tol=8)
     
     summary_totals = {}
+    period = None
+    all_p1_lines = group_words_into_lines(p1_words, y_tol=8)
+    for y, line in all_p1_lines:
+        pnc_match = re.search(r'\bFor\s+the\s+Per[iodl1]{2,4}\s+(.*?)(?:\bPrimary\b|\bAccount\b|$)', line, re.IGNORECASE)
+        if pnc_match:
+            period = f"For the Period {pnc_match.group(1).strip()}"
+            break
     
     for y, line in left_p1_lines:
         if 'ATM Deposits' in line:
@@ -880,7 +899,7 @@ def run_pnc_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation, 1
+    return formatted_df, reconciliation, 1, period
 
 def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING BANK OF AMERICA PROCESSING ===")
@@ -891,6 +910,19 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
         return
         
     p1_lines = group_words_into_lines(p1_words, y_tol=8)
+    period = None
+    for y, line in p1_lines:
+        boa_match = re.search(r'\bfor\s+([a-z]+\s+\d{1,2}\s*,\s*\d{4}\s+to\s+[a-z]+\s+\d{1,2}\s*,\s*\d{4})', line, re.IGNORECASE)
+        if boa_match:
+            period = 'For ' + line[boa_match.start(1):boa_match.end(1)].strip()
+            break
+    if not period:
+        for y, line in p1_lines:
+            line_clean = line.strip()
+            if line_clean.lower().startswith('for ') and 'to' in line_clean.lower() and y < 500:
+                period = 'For ' + line_clean[4:].strip()
+                break
+
     summary_totals = {
         'Deposits and other credits': 0.0,
         'Withdrawals and other debits': 0.0,
@@ -1085,7 +1117,7 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation, 1
+    return formatted_df, reconciliation, 1, period
 
 def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING TD BANK PROCESSING ===")
@@ -1118,6 +1150,14 @@ def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
         day = int(m.group(2))
         year = start_year if month == start_month else end_year
         return f"{year}-{month:02d}-{day:02d}"
+
+    period = None
+    all_p1_lines = group_words_into_lines(p1_words, y_tol=8)
+    for y, line in all_p1_lines:
+        td_match = re.search(r'Statement\s+Period\s*:\s*(.*)', line, re.IGNORECASE)
+        if td_match:
+            period = f"Statement Period {td_match.group(1).strip()}"
+            break
 
     left_p1 = [w for w in p1_words if w['center_x'] < 600 and w['center_y'] < 800]
     left_p1_lines = group_words_into_lines(left_p1, y_tol=8)
@@ -1277,7 +1317,7 @@ def run_td_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation, 1
+    return formatted_df, reconciliation, 1, period
 
 def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
     print("=== STARTING TRUIST BANK PROCESSING ===")
@@ -1306,6 +1346,20 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
     left_lines = group_words_into_lines(left_words, y_tol=8)
     right_lines = group_words_into_lines(right_words, y_tol=8)
     
+    period = None
+    all_p1_lines = group_words_into_lines(p1_words, y_tol=8)
+    for y, line in all_p1_lines:
+        truist_match = re.search(r'\bFor\s+(\d{2}/\d{2}/\d{4})\b', line, re.IGNORECASE)
+        if truist_match:
+            period = f"For {truist_match.group(1)}"
+            break
+    if not period:
+        for y, line in all_p1_lines:
+            line_clean = line.strip()
+            if line_clean.lower().startswith('for ') and y < 600:
+                period = 'For ' + line_clean[4:].strip()
+                break
+
     y_summary_start = None
     y_checks_start = None
     for w in p1_words:
@@ -1501,7 +1555,7 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
     else:
         print("\n=== NO RECONCILIATION SUMMARY DATA AVAILABLE ===")
         
-    return formatted_df, reconciliation, 1
+    return formatted_df, reconciliation, 1, period
 
 def run_extraction(pdf_path, temp_dir, create_csv=False):
     convert_pdf_to_png(pdf_path, temp_dir)
@@ -1537,15 +1591,15 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
         all_pages_words[page_name] = words
         
     if bank_type == 'WELLS_FARGO':
-        formatted_df, reconciliation, summary_page = run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period = run_wells_fargo_pipeline(all_pages_words, pdf_path, csv_output_path)
     elif bank_type == 'BANK_OF_AMERICA':
-        formatted_df, reconciliation, summary_page = run_boa_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period = run_boa_pipeline(all_pages_words, pdf_path, csv_output_path)
     elif bank_type == 'TD_BANK':
-        formatted_df, reconciliation, summary_page = run_td_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period = run_td_pipeline(all_pages_words, pdf_path, csv_output_path)
     elif bank_type == 'TRUIST':
-        formatted_df, reconciliation, summary_page = run_truist_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period = run_truist_pipeline(all_pages_words, pdf_path, csv_output_path)
     else:
-        formatted_df, reconciliation, summary_page = run_pnc_pipeline(all_pages_words, pdf_path, csv_output_path)
+        formatted_df, reconciliation, summary_page, period = run_pnc_pipeline(all_pages_words, pdf_path, csv_output_path)
         
     import base64
     summary_img_path = os.path.join(temp_dir, f"page_{summary_page}.png")
@@ -1559,6 +1613,7 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
     return {
         "bank_type": bank_type,
         "business_name": bus_name,
+        "period": period,
         "transactions": clean_df.to_dict(orient='records'),
         "reconciliation": reconciliation,
         "summary_page": summary_page,

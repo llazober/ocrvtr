@@ -409,6 +409,7 @@
                 <!-- Header with bank/business info -->
                 <div class="results-header" style="margin-bottom: 24px; text-align: left; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                     <h2 id="resultBusinessName" style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Business Name</h2>
+                    <p id="resultPeriod" style="color: var(--text-muted); font-size: 1.05rem; font-weight: 500; margin-top: 4px; margin-bottom: 8px; font-family: 'Outfit', sans-serif; display: none;">Period</p>
                     <p id="resultBankType" style="color: var(--text-muted); font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Bank Type</p>
                 </div>
                 
@@ -661,6 +662,15 @@
 
                 // Populate and display results
                 document.getElementById('resultBusinessName').textContent = result.business_name || 'Business Name Not Detected';
+                
+                const periodEl = document.getElementById('resultPeriod');
+                if (result.period) {
+                    periodEl.textContent = result.period;
+                    periodEl.style.display = 'block';
+                } else {
+                    periodEl.style.display = 'none';
+                }
+
                 document.getElementById('resultBankType').textContent = `Detected Bank: ${result.bank_type.replace('_', ' ')}`;
 
                 // Populate reconciliation cards
@@ -771,7 +781,20 @@
             const blob = new Blob([csvContent], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             
-            const filename = (currentResult.business_name ? currentResult.business_name.replace(/[^a-zA-Z0-9]/g, '_') : 'statement') + '.csv';
+            let baseName = 'statement';
+            if (currentResult.business_name) {
+                baseName = currentResult.business_name;
+                if (currentResult.period) {
+                    baseName += '_' + currentResult.period;
+                }
+            } else if (currentResult.period) {
+                baseName = currentResult.period;
+            }
+            
+            let sanitized = baseName.replace(/[\\/:]/g, '-');
+            sanitized = sanitized.replace(/[*?"<>|]/g, '');
+            sanitized = sanitized.replace(/\s+/g, ' ').replace(/-+/g, '-').trim();
+            const filename = sanitized + '.csv';
             
             const link = document.createElement("a");
             link.href = url;
@@ -790,7 +813,20 @@
             const blob = new Blob([JSON.stringify(currentResult, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             
-            const filename = (currentResult.business_name ? currentResult.business_name.replace(/[^a-zA-Z0-9]/g, '_') : 'statement') + '.json';
+            let baseName = 'statement';
+            if (currentResult.business_name) {
+                baseName = currentResult.business_name;
+                if (currentResult.period) {
+                    baseName += '_' + currentResult.period;
+                }
+            } else if (currentResult.period) {
+                baseName = currentResult.period;
+            }
+            
+            let sanitized = baseName.replace(/[\\/:]/g, '-');
+            sanitized = sanitized.replace(/[*?"<>|]/g, '');
+            sanitized = sanitized.replace(/\s+/g, ' ').replace(/-+/g, '-').trim();
+            const filename = sanitized + '.json';
             
             const link = document.createElement("a");
             link.href = url;
