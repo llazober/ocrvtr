@@ -378,18 +378,16 @@ def format_df_to_standard_columns(df):
                 
             dep_val = amt if is_deposit else None
             wit_val = amt if not is_deposit else None
-            account_val = 260 if is_deposit else 500
             
             formatted_rows.append({
                 'date': row['date'],
                 'checknumber': chk,
                 'description': desc,
-                'Account:': account_val,
                 'Deposits': dep_val,
                 'Withdrawals': wit_val
             })
         
-    res_df = pd.DataFrame(formatted_rows, columns=['date', 'checknumber', 'description', 'Account:', 'Deposits', 'Withdrawals'])
+    res_df = pd.DataFrame(formatted_rows, columns=['date', 'checknumber', 'description', 'Deposits', 'Withdrawals'])
     return res_df
 
 def detect_bank(p1_words):

@@ -483,7 +483,6 @@
                                     <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Date</th>
                                     <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Check #</th>
                                     <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Description</th>
-                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Account:</th>
                                     <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-align: right;">Deposits</th>
                                     <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-align: right;">Withdrawals</th>
                                 </tr>
@@ -807,96 +806,7 @@
                 }
 
                 const result = await response.json();
-                currentResult = result;
-
-                // Populate and display results
-                document.getElementById('resultBusinessName').textContent = result.business_name || 'Business Name Not Detected';
-                
-                const periodEl = document.getElementById('resultPeriod');
-                if (result.period) {
-                    periodEl.textContent = result.period;
-                    periodEl.style.display = 'block';
-                } else {
-                    periodEl.style.display = 'none';
-                }
-
-                document.getElementById('resultBankType').textContent = `Detected Bank: ${result.bank_type.replace('_', ' ')}`;
-
-                // Populate warnings if present
-                const warningsDiv = document.getElementById('resultsWarnings');
-                const warningsList = document.getElementById('resultsWarningsList');
-                warningsList.innerHTML = '';
-                if (result.warnings && result.warnings.length > 0) {
-                    result.warnings.forEach(warning => {
-                        const div = document.createElement('div');
-                        div.style.marginBottom = '6px';
-                        div.textContent = warning;
-                        warningsList.appendChild(div);
-                    });
-                    warningsDiv.style.display = 'block';
-                } else {
-                    warningsDiv.style.display = 'none';
-                }
-
-                // Populate reconciliation cards
-                const reconContainer = document.getElementById('reconciliationCards');
-                reconContainer.innerHTML = '';
-                
-                result.reconciliation.forEach(item => {
-                    const isReconciled = Math.abs(item.Difference) < 0.01;
-                    const diffText = isReconciled 
-                        ? '✓ Reconciled (Diff: $0.00)' 
-                        : `✗ Discrepancy (Diff: $${item.Difference.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})})`;
-                    const statusColor = isReconciled ? 'var(--success-color)' : 'var(--error-color)';
-                    
-                    const card = document.createElement('div');
-                    card.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);';
-                    card.innerHTML = `
-                        <h4 style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">${item.Category}</h4>
-                        <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; font-family: 'Outfit', sans-serif;">$${item['Detail Sum'].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                        <div style="font-size: 0.85rem; color: ${statusColor}; font-weight: 600; display: flex; align-items: center;">${diffText}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Summary total: $${item['Summary Amount'].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${item['Items Count']} items)</div>
-                    `;
-                    reconContainer.appendChild(card);
-                });
-
-                // Populate transactions table
-                const tableBody = document.getElementById('transactionsTableBody');
-                tableBody.innerHTML = '';
-                
-                document.getElementById('txCountBadge').textContent = `${result.transactions.length} records`;
-
-                result.transactions.forEach(tx => {
-                    const tr = document.createElement('tr');
-                    tr.style.cssText = 'border-bottom: 1px solid rgba(255, 255, 255, 0.04); transition: background 0.2s ease;';
-                    tr.addEventListener('mouseenter', () => tr.style.background = 'rgba(255,255,255,0.02)');
-                    tr.addEventListener('mouseleave', () => tr.style.background = 'transparent');
-                    
-                    const checkNum = tx.checknumber !== null && tx.checknumber !== undefined && !isNaN(tx.checknumber) ? tx.checknumber : '';
-                    
-                    const formatAmt = (val) => {
-                        if (val === null || val === undefined || isNaN(val)) return '';
-                        return '$' + Number(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                    };
-
-                    const accountVal = tx['Account:'] !== undefined && tx['Account:'] !== null ? tx['Account:'] : (tx.Deposits !== null && tx.Deposits !== undefined && tx.Deposits !== '' ? 260 : 500);
-
-                    tr.innerHTML = `
-                        <td style="padding: 12px 16px; color: var(--text-main); font-weight: 500;">${tx.date}</td>
-                        <td style="padding: 12px 16px; color: var(--text-muted);">${checkNum}</td>
-                        <td style="padding: 12px 16px; color: var(--text-main); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${tx.description}">${tx.description}</td>
-                        <td style="padding: 12px 16px; color: var(--text-muted);">${accountVal}</td>
-                        <td style="padding: 12px 16px; color: var(--success-color); text-align: right; font-weight: 500;">${formatAmt(tx.Deposits)}</td>
-                        <td style="padding: 12px 16px; color: var(--error-color); text-align: right; font-weight: 500;">${formatAmt(tx.Withdrawals)}</td>
-                    `;
-                    tableBody.appendChild(tr);
-                });
-
-                // Transition UI to results
-                loadingState.style.display = 'none';
-                document.getElementById('resultsContainer').style.display = 'block';
-                // Update page container max-width to display table beautifully
-                document.querySelector('.container').style.maxWidth = '900px';
+                displayResults(result);
 
             } catch (error) {
                 console.error(error);
@@ -912,6 +822,146 @@
         const downloadJsonBtn = document.getElementById('downloadJsonBtn');
         let currentResult = null;
 
+        function formatHeaderLabel(key) {
+            if (key === 'date') return 'Date';
+            if (key === 'checknumber') return 'Check #';
+            if (key === 'description') return 'Description';
+            return key.charAt(0).toUpperCase() + key.slice(1);
+        }
+
+        function formatAmt(val) {
+            if (val === null || val === undefined || isNaN(val)) return '';
+            return '$' + Number(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function displayResults(result) {
+            currentResult = result;
+
+            // Populate and display results
+            document.getElementById('resultBusinessName').textContent = result.business_name || 'Business Name Not Detected';
+            
+            const periodEl = document.getElementById('resultPeriod');
+            if (result.period) {
+                periodEl.textContent = result.period;
+                periodEl.style.display = 'block';
+            } else {
+                periodEl.style.display = 'none';
+            }
+
+            document.getElementById('resultBankType').textContent = `Detected Bank: ${result.bank_type.replace('_', ' ')}`;
+
+            // Populate warnings if present
+            const warningsDiv = document.getElementById('resultsWarnings');
+            const warningsList = document.getElementById('resultsWarningsList');
+            warningsList.innerHTML = '';
+            if (result.warnings && result.warnings.length > 0) {
+                result.warnings.forEach(warning => {
+                    const div = document.createElement('div');
+                    div.style.marginBottom = '6px';
+                    div.textContent = warning;
+                    warningsList.appendChild(div);
+                });
+                warningsDiv.style.display = 'block';
+            } else {
+                warningsDiv.style.display = 'none';
+            }
+
+            // Populate reconciliation cards
+            const reconContainer = document.getElementById('reconciliationCards');
+            reconContainer.innerHTML = '';
+            
+            result.reconciliation.forEach(item => {
+                const isReconciled = Math.abs(item.Difference) < 0.01;
+                const diffText = isReconciled 
+                    ? '✓ Reconciled (Diff: $0.00)' 
+                    : `✗ Discrepancy (Diff: $${item.Difference.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})})`;
+                const statusColor = isReconciled ? 'var(--success-color)' : 'var(--error-color)';
+                
+                const card = document.createElement('div');
+                card.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);';
+                card.innerHTML = `
+                    <h4 style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">${item.Category}</h4>
+                    <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; font-family: 'Outfit', sans-serif;">$${item['Detail Sum'].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                    <div style="font-size: 0.85rem; color: ${statusColor}; font-weight: 600; display: flex; align-items: center;">${diffText}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Summary total: $${item['Summary Amount'].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${item['Items Count']} items)</div>
+                `;
+                reconContainer.appendChild(card);
+            });
+
+            // Populate transactions table dynamically based on returned keys
+            const tableHead = document.querySelector('.transactions-section table thead');
+            tableHead.innerHTML = '';
+            const headerRow = document.createElement('tr');
+            headerRow.style.textAlign = 'left';
+            
+            const firstTx = result.transactions[0] || {};
+            const keys = Object.keys(firstTx);
+            
+            keys.forEach(key => {
+                const th = document.createElement('th');
+                th.style.cssText = 'padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);';
+                if (key === 'Deposits' || key === 'Withdrawals') {
+                    th.style.textAlign = 'right';
+                }
+                th.textContent = formatHeaderLabel(key);
+                headerRow.appendChild(th);
+            });
+            tableHead.appendChild(headerRow);
+
+            const tableBody = document.getElementById('transactionsTableBody');
+            tableBody.innerHTML = '';
+            
+            document.getElementById('txCountBadge').textContent = `${result.transactions.length} records`;
+
+            result.transactions.forEach(tx => {
+                const tr = document.createElement('tr');
+                tr.style.cssText = 'border-bottom: 1px solid rgba(255, 255, 255, 0.04); transition: background 0.2s ease;';
+                tr.addEventListener('mouseenter', () => tr.style.background = 'rgba(255,255,255,0.02)');
+                tr.addEventListener('mouseleave', () => tr.style.background = 'transparent');
+                
+                keys.forEach(key => {
+                    const td = document.createElement('td');
+                    td.style.padding = '12px 16px;';
+                    
+                    let val = tx[key];
+                    
+                    if (key === 'date') {
+                        td.style.color = 'var(--text-main)';
+                        td.style.fontWeight = '500';
+                        td.textContent = val || '';
+                    } else if (key === 'checknumber') {
+                        td.style.color = 'var(--text-muted)';
+                        const checkNum = val !== null && val !== undefined && !isNaN(val) ? val : '';
+                        td.textContent = checkNum;
+                    } else if (key === 'description') {
+                        td.style.color = 'var(--text-main)';
+                        td.style.maxWidth = '250px';
+                        td.style.overflow = 'hidden';
+                        td.style.textOverflow = 'ellipsis';
+                        td.style.whiteSpace = 'nowrap';
+                        td.title = val || '';
+                        td.textContent = val || '';
+                    } else if (key === 'Deposits' || key === 'Withdrawals') {
+                        td.style.textAlign = 'right';
+                        td.style.fontWeight = '500';
+                        td.style.color = key === 'Deposits' ? 'var(--success-color)' : 'var(--error-color)';
+                        td.textContent = formatAmt(val);
+                    } else {
+                        // Dynamic column support
+                        td.style.color = 'var(--text-main)';
+                        td.textContent = val !== null && val !== undefined ? String(val) : '';
+                    }
+                    tr.appendChild(td);
+                });
+                tableBody.appendChild(tr);
+            });
+
+            // Transition UI
+            loadingState.style.display = 'none';
+            document.getElementById('resultsContainer').style.display = 'block';
+            document.querySelector('.container').style.maxWidth = '900px';
+        }
+
         // Hover animations for download buttons
         [downloadCsvBtn, downloadJsonBtn].forEach(btn => {
             btn.addEventListener('mouseenter', () => {
@@ -925,23 +975,23 @@
         });
 
         downloadCsvBtn.addEventListener('click', () => {
-            if (!currentResult || !currentResult.transactions) return;
+            if (!currentResult || !currentResult.transactions || currentResult.transactions.length === 0) return;
             
             try {
-                const headers = ['date', 'checknumber', 'description', 'Account:', 'Deposits', 'Withdrawals'];
+                const firstTx = currentResult.transactions[0];
+                const keys = Object.keys(firstTx);
+                
+                const headers = keys.map(key => formatHeaderLabel(key));
                 const csvRows = [headers.join(',')];
                 
                 currentResult.transactions.forEach(tx => {
-                    const values = headers.map(header => {
-                        let val = tx[header];
-                        if (header === 'Account:' && (val === null || val === undefined)) {
-                            val = (tx.Deposits !== null && tx.Deposits !== undefined && tx.Deposits !== '') ? 260 : 500;
-                        }
+                    const values = keys.map(key => {
+                        let val = tx[key];
                         if (val === null || val === undefined) {
                             return '';
                         }
                         val = String(val);
-                        if (header === 'description' && val.length >= 99) {
+                        if (key === 'description' && val.length >= 99) {
                             val = val.substring(0, 98);
                         }
                         if (val.includes(',') || val.includes('"') || val.includes('\n')) {
@@ -952,8 +1002,8 @@
                     csvRows.push(values.join(','));
                 });
                 
-                const csvContent = csvRows.join('\n');
-                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const csvContent = csvRows.join('\r\n');
+                const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
                 
                 let baseName = 'statement';
@@ -979,7 +1029,9 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                }, 100);
             } catch (err) {
                 console.error(err);
                 showAlert(`Error downloading CSV: ${err.message}`, 'error');
@@ -1016,7 +1068,9 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                }, 100);
             } catch (err) {
                 console.error(err);
                 showAlert(`Error downloading JSON: ${err.message}`, 'error');
@@ -1233,14 +1287,13 @@
                     period: "For March 1, 2026 to March 31, 2026",
                     bank_type: "TRUIST",
                     transactions: [
-                        { date: "2026-03-01", checknumber: "101", description: "Deposit Test", "Account:": 260, Deposits: 1000.0, Withdrawals: null },
-                        { date: "2026-03-02", checknumber: "", description: "Withdrawal Test", "Account:": 500, Deposits: null, Withdrawals: 50.0 }
+                        { date: "2026-03-01", checknumber: "101", description: "Deposit Test", Deposits: 1000.0, Withdrawals: null },
+                        { date: "2026-03-02", checknumber: "", description: "Withdrawal Test", Deposits: null, Withdrawals: 50.0 }
                     ],
                     reconciliation: []
                 };
-                currentResult = dummyResult;
-                document.getElementById('resultsContainer').style.display = 'block';
-                document.querySelector('.container').style.maxWidth = '900px';
+                
+                displayResults(dummyResult);
                 
                 // Show test message
                 const statusDiv = document.createElement('div');
