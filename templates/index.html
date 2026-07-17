@@ -978,28 +978,49 @@
             if (!currentResult || !currentResult.transactions || currentResult.transactions.length === 0) return;
             
             try {
-                const firstTx = currentResult.transactions[0];
-                const keys = Object.keys(firstTx);
-                
-                const headers = keys.map(key => formatHeaderLabel(key));
-                const csvRows = [headers.join(',')];
-                
+                // Fixed column order with renamed headers:
+                // Type | Date | Entity Code | Account | Debit (Deposits) | Credit (Withdrawals) | Description | Reference (Check #)
+                const csvHeaders = ['Type', 'Date', 'Entity Code', 'Account', 'Debit', 'Credit', 'Description', 'Reference'];
+                const csvRows = [csvHeaders.join(',')];
+
+                function csvEscape(val) {
+                    if (val === null || val === undefined) return '';
+                    val = String(val);
+                    if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                        val = `"${val.replace(/"/g, '""')}"`;
+                    }
+                    return val;
+                }
+
                 currentResult.transactions.forEach(tx => {
-                    const values = keys.map(key => {
-                        let val = tx[key];
-                        if (val === null || val === undefined) {
-                            return '';
-                        }
-                        val = String(val);
-                        if (key === 'description' && val.length >= 99) {
-                            val = val.substring(0, 98);
-                        }
-                        if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-                            val = `"${val.replace(/"/g, '""')}"`;
-                        }
-                        return val;
-                    });
-                    csvRows.push(values.join(','));
+                    // Determine Account: 260 for Debit (has Deposits value), 500 for Credit (has Withdrawals value)
+                    const hasDebit  = tx.Deposits  !== null && tx.Deposits  !== undefined && tx.Deposits  !== '';
+                    const hasCredit = tx.Withdrawals !== null && tx.Withdrawals !== undefined && tx.Withdrawals !== '';
+                    const accountVal = hasDebit ? '260' : (hasCredit ? '500' : '');
+
+                    // Truncate description to 98 chars
+                    let desc = tx.description !== null && tx.description !== undefined ? String(tx.description) : '';
+                    if (desc.length >= 99) desc = desc.substring(0, 98);
+
+                    // Debit value (Deposits field)
+                    const debitVal  = hasDebit  ? String(tx.Deposits)    : '';
+                    // Credit value (Withdrawals field)
+                    const creditVal = hasCredit ? String(tx.Withdrawals) : '';
+
+                    // Reference (Check #)
+                    const checkNum = tx.checknumber !== null && tx.checknumber !== undefined && !isNaN(tx.checknumber) && tx.checknumber !== '' ? String(tx.checknumber) : '';
+
+                    const row = [
+                        csvEscape('GJ'),           // Type
+                        csvEscape(tx.date || ''),  // Date
+                        '',                        // Entity Code (always empty)
+                        csvEscape(accountVal),     // Account
+                        csvEscape(debitVal),       // Debit (Deposits)
+                        csvEscape(creditVal),      // Credit (Withdrawals)
+                        csvEscape(desc),           // Description
+                        csvEscape(checkNum)        // Reference (Check #)
+                    ];
+                    csvRows.push(row.join(','));
                 });
                 
                 const csvContent = csvRows.join('\r\n');
@@ -1016,15 +1037,15 @@
                     baseName = currentResult.period;
                 }
                 
-                let sanitized = baseName.replace(/[\\/:]/g, '-');
+                let sanitized = baseName.replace(/[\\/:-]/g, '-');
                 sanitized = sanitized.replace(/[*?"<>|]/g, '');
                 sanitized = sanitized.replace(/\s+/g, ' ').replace(/-+/g, '-').trim();
                 const filename = sanitized + '.csv';
                 
-                const link = document.createElement("a");
+                const link = document.createElement('a');
                 link.href = url;
                 link.download = filename;
-                link.setAttribute("download", filename);
+                link.setAttribute('download', filename);
                 link.style.display = 'none';
                 document.body.appendChild(link);
                 link.click();
@@ -1288,7 +1309,8 @@
                     bank_type: "TRUIST",
                     transactions: [
                         { date: "2026-03-01", checknumber: "101", description: "Deposit Test", Deposits: 1000.0, Withdrawals: null },
-                        { date: "2026-03-02", checknumber: "", description: "Withdrawal Test", Deposits: null, Withdrawals: 50.0 }
+                        { date: "2026-03-02", checknumber: "",    description: "Withdrawal Test", Deposits: null, Withdrawals: 50.0 },
+                        { date: "2026-03-03", checknumber: "205", description: "Check Payment",  Deposits: null, Withdrawals: 200.0 }
                     ],
                     reconciliation: []
                 };
