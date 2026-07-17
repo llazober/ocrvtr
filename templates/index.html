@@ -905,6 +905,14 @@
                 }
                 th.textContent = formatHeaderLabel(key);
                 headerRow.appendChild(th);
+
+                // Inject Account header right after Date
+                if (key === 'date') {
+                    const thAcc = document.createElement('th');
+                    thAcc.style.cssText = 'padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);';
+                    thAcc.textContent = 'Account';
+                    headerRow.appendChild(thAcc);
+                }
             });
             tableHead.appendChild(headerRow);
 
@@ -921,7 +929,7 @@
                 
                 keys.forEach(key => {
                     const td = document.createElement('td');
-                    td.style.padding = '12px 16px;';
+                    td.style.padding = '12px 16px';
                     
                     let val = tx[key];
                     
@@ -929,6 +937,18 @@
                         td.style.color = 'var(--text-main)';
                         td.style.fontWeight = '500';
                         td.textContent = val || '';
+                        tr.appendChild(td);
+
+                        // Inject Account cell right after Date
+                        const tdAcc = document.createElement('td');
+                        tdAcc.style.padding = '12px 16px';
+                        const hasDeposit = tx.Deposits !== null && tx.Deposits !== undefined && tx.Deposits !== '';
+                        const hasWithdrawal = tx.Withdrawals !== null && tx.Withdrawals !== undefined && tx.Withdrawals !== '';
+                        tdAcc.style.color = 'var(--text-muted)';
+                        tdAcc.style.fontWeight = '500';
+                        tdAcc.textContent = hasDeposit ? '260' : (hasWithdrawal ? '500' : '');
+                        tr.appendChild(tdAcc);
+                        return; // td already appended above
                     } else if (key === 'checknumber') {
                         td.style.color = 'var(--text-muted)';
                         const checkNum = val !== null && val !== undefined && !isNaN(val) ? val : '';
