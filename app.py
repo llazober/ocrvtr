@@ -133,21 +133,39 @@ async def support_submit(
     if not get_current_session(request):
         raise HTTPException(status_code=401, detail="Not authenticated.")
 
-    resend_key = os.environ.get("RESEND_API_KEY")
+    resend_key = (
+        os.environ.get("RESEND_API_KEY") or
+        os.environ.get("RESEND_KEY") or
+        os.environ.get("RESEND_API_TOKEN") or
+        os.environ.get("RESEND_TOKEN")
+    )
     if resend_key:
         resend_key = resend_key.strip().strip('\'"')
     if not resend_key or not resend_key.startswith("re_"):
         raise HTTPException(
             status_code=500,
-            detail="Support email feature is not configured: RESEND_API_KEY environment variable is missing or invalid on the server. Please add your Resend API Key in Easypanel environment variables."
+            detail="Support email feature is not configured: Resend API Key is missing or invalid on the server. Please add your Resend API Key (e.g., RESEND_API_KEY) in Easypanel environment variables."
         )
 
-    from_email = os.environ.get("RESEND_FROM_EMAIL")
+    from_email = (
+        os.environ.get("RESEND_FROM_EMAIL") or
+        os.environ.get("FROM_EMAIL") or
+        os.environ.get("SENDER_EMAIL")
+    )
     if from_email:
         from_email = from_email.strip().strip('\'"')
     if not from_email or "@" not in from_email:
-        from_email = "vrt@nelsonmar.com"
-    to_email = "luislazo@datalazo.net"
+        from_email = "support@datalazo.net"
+        
+    to_email = (
+        os.environ.get("RESEND_TO_EMAIL") or
+        os.environ.get("TO_EMAIL") or
+        os.environ.get("SUPPORT_EMAIL")
+    )
+    if to_email:
+        to_email = to_email.strip().strip('\'"')
+    if not to_email or "@" not in to_email:
+        to_email = "luislazo@datalazo.net"
     
     subject = "Support Request - Bank Statement OCR Extractor"
     
@@ -197,9 +215,9 @@ async def support_submit(
         err_body = e.read().decode('utf-8')
         print(f"Failed to send email via Resend: Code {e.code}, Response: {err_body}")
         
-        env_raw = os.environ.get("RESEND_API_KEY", "")
-        masked_env = f"{env_raw[:6]}...{env_raw[-4:]}" if len(env_raw) > 10 else env_raw
-        raise HTTPException(status_code=500, detail=f"Failed to send support email: {err_body}. Raw Env Key: {masked_env}, From: {from_email}")
+        found_key = resend_key or ""
+        masked_env = f"{found_key[:6]}...{found_key[-4:]}" if len(found_key) > 10 else found_key
+        raise HTTPException(status_code=500, detail=f"Failed to send support email: {err_body}. Used Key: {masked_env}, From: {from_email}")
     except Exception as e:
         print(f"Error occurred while sending email: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error sending email: {str(e)}")
@@ -208,49 +226,104 @@ async def support_submit(
 @app.get("/health")
 async def health_check():
     import json as _json
-    status = {"status": "ok", "credentials": None, "error": None}
     
-    # 1. Check GOOGLE_CREDENTIALS_JSON
+    # 1. Check Google Vision credentials
+    google_status = "error"
+    google_detail = "MISSING"
+    google_error = None
+    
+    # Check GOOGLE_CREDENTIALS_JSON env var
     creds_raw = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
     if creds_raw:
         creds_stripped = creds_raw.strip().strip('"\'')
         try:
             info = _json.loads(creds_stripped)
-            status["credentials"] = f"GOOGLE_CREDENTIALS_JSON: OK — project_id={info.get('project_id')}, client_email={info.get('client_email')}"
-            return status
+            google_status = "ok"
+            google_detail = f"GOOGLE_CREDENTIALS_JSON: OK — project_id={info.get('project_id')}, client_email={info.get('client_email')}"
         except Exception as e:
-            status["credentials"] = "GOOGLE_CREDENTIALS_JSON: INVALID JSON"
-            status["error"] = str(e)
-            status["status"] = "error"
+            google_detail = "GOOGLE_CREDENTIALS_JSON: INVALID JSON"
+            google_error = str(e)
             
-    # 2. Check GOOGLE_APPLICATION_CREDENTIALS file
-    env_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-    if env_path and os.path.exists(env_path):
-        status["status"] = "ok"
-        status["credentials"] = f"GOOGLE_APPLICATION_CREDENTIALS file exists: {env_path}"
-        status["error"] = None
-        return status
+    # Check GOOGLE_APPLICATION_CREDENTIALS file path
+    if google_status != "ok":
+        env_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if env_path:
+            env_path_stripped = env_path.strip().strip('"\'')
+            if os.path.exists(env_path_stripped):
+                google_status = "ok"
+                google_detail = f"GOOGLE_APPLICATION_CREDENTIALS file exists: {env_path_stripped}"
+            else:
+                google_detail = f"GOOGLE_APPLICATION_CREDENTIALS path specified but file not found: {env_path_stripped}"
+                
+    # Check Fallback paths
+    if google_status != "ok":
+        fallback_paths = [
+            r"C:\keys\vision-keyvtr.json",
+            r"/keys/vision-keyvtr.json",
+            r"C:\keys\vision-key.json",
+            r"/keys/vision-key.json",
+        ]
+        for path in fallback_paths:
+            if os.path.exists(path):
+                google_status = "ok"
+                google_detail = f"Fallback file exists: {path}"
+                break
 
-    # 3. Check Fallbacks
-    fallback_paths = [
-        r"C:\keys\vision-keyvtr.json",
-        r"/keys/vision-keyvtr.json",
-        r"C:\keys\vision-key.json",
-        r"/keys/vision-key.json",
-    ]
-    for path in fallback_paths:
-        if os.path.exists(path):
-            status["status"] = "ok"
-            status["credentials"] = f"Fallback file exists: {path}"
-            status["error"] = None
-            return status
-
-    # If nothing is found
-    if not status["credentials"]:
-        status["credentials"] = "MISSING"
-        status["status"] = "error"
+    # 2. Check Support Email (Resend) credentials
+    resend_key = (
+        os.environ.get("RESEND_API_KEY") or
+        os.environ.get("RESEND_KEY") or
+        os.environ.get("RESEND_API_TOKEN") or
+        os.environ.get("RESEND_TOKEN")
+    )
+    
+    resend_status = "error"
+    resend_detail = "MISSING"
+    
+    if resend_key:
+        resend_key = resend_key.strip().strip('\'"')
+        if resend_key.startswith("re_"):
+            resend_status = "ok"
+            masked_key = f"{resend_key[:6]}...{resend_key[-4:]}" if len(resend_key) > 10 else "re_..."
+            resend_detail = f"Configured (API Key: {masked_key})"
+        else:
+            resend_detail = "Invalid API Key format (Must start with 're_')"
+            
+    from_email = (
+        os.environ.get("RESEND_FROM_EMAIL") or
+        os.environ.get("FROM_EMAIL") or
+        os.environ.get("SENDER_EMAIL") or
+        "support@datalazo.net"
+    )
+    if from_email:
+        from_email = from_email.strip().strip('\'"')
         
-    return status
+    to_email = (
+        os.environ.get("RESEND_TO_EMAIL") or
+        os.environ.get("TO_EMAIL") or
+        os.environ.get("SUPPORT_EMAIL") or
+        "luislazo@datalazo.net"
+    )
+    if to_email:
+        to_email = to_email.strip().strip('\'"')
+
+    # Overall health check status (depends primarily on extraction pipeline's Google Vision capability)
+    overall_status = "ok" if google_status == "ok" else "error"
+    
+    return {
+        "status": overall_status,
+        "google_vision": {
+            "status": google_status,
+            "detail": google_detail,
+            "error": google_error
+        },
+        "support_email": {
+            "status": resend_status,
+            "detail": resend_detail,
+            "from_email": from_email,
+            "to_email": to_email
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn
