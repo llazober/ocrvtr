@@ -114,6 +114,56 @@ def update_terms_accepted(username: str, ip: str, user_agent: str) -> bool:
         if conn:
             conn.close()
 
+def record_user_usage(username: str, page_count: int):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('SELECT "monthlyUsageActual", "monthlyUsagePrevious", "updatedAt" FROM "ClientUser" WHERE username = %s;', (username,))
+            user = cur.fetchone()
+            if not user:
+                return
+            
+            actual = user.get("monthlyUsageActual", 0) or 0
+            prev = user.get("monthlyUsagePrevious", 0) or 0
+            last_updated = user.get("updatedAt")
+            
+            import datetime
+            now = datetime.datetime.now(datetime.timezone.utc)
+            
+            # Determine if a new month has started
+            is_new_month = False
+            if last_updated:
+                # Remove timezone for database timestamps without time zone
+                if last_updated.tzinfo is None:
+                    now_compare = now.replace(tzinfo=None)
+                else:
+                    now_compare = now
+                
+                if (now_compare.year != last_updated.year) or (now_compare.month != last_updated.month):
+                    is_new_month = True
+            else:
+                is_new_month = True
+                
+            if is_new_month:
+                new_prev = actual
+                new_actual = page_count
+            else:
+                new_prev = prev
+                new_actual = actual + page_count
+                
+            cur.execute(
+                'UPDATE "ClientUser" SET "monthlyUsageActual" = %s, "monthlyUsagePrevious" = %s, "updatedAt" = %s WHERE username = %s;',
+                (new_actual, new_prev, now, username)
+            )
+            conn.commit()
+            print(f"Recorded usage for {username}: {page_count} pages. Actual: {new_actual}, Previous: {new_prev}")
+    except Exception as e:
+        print(f"Database error recording usage: {e}")
+    finally:
+        if conn:
+            conn.close()
+
 # ── Auth routes ────────────────────────────────────────────────────────────────
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = "", username: str = ""):
@@ -233,6 +283,19 @@ async def process_pdf(
 
     try:
         result_data = run_extraction(pdf_path, temp_dir, create_csv=False)
+        
+        # Record usage if logged in as a ClientUser (and not the fallback admin)
+        current_username = get_current_username(request)
+        if current_username and current_username != APP_USERNAME:
+            import fitz
+            try:
+                doc = fitz.open(pdf_path)
+                page_count = len(doc)
+                doc.close()
+                record_user_usage(current_username, page_count)
+            except Exception as ex:
+                print(f"Error counting pages or recording usage: {ex}")
+                
         background_tasks.add_task(cleanup_temp_dir, temp_dir)
         return result_data
     except Exception as e:
