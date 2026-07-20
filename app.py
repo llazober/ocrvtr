@@ -6,6 +6,10 @@ import base64
 import json
 import urllib.request
 import urllib.error
+import hashlib
+import hmac
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, File, UploadFile, BackgroundTasks, Form, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -20,12 +24,16 @@ APP_USERNAME = os.environ.get("APP_USERNAME", "admin@vrtservices12.com")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "hon12345")
 COOKIE_NAME  = "ocr_session"
 
-# In-memory set of valid session tokens (cleared on restart — fine for single user)
-valid_sessions: set[str] = set()
+# In-memory dict of valid sessions mapping token -> username (cleared on restart)
+valid_sessions: dict[str, str] = {}
 
 def get_current_session(request: Request) -> str | None:
     token = request.cookies.get(COOKIE_NAME)
     return token if token in valid_sessions else None
+
+def get_current_username(request: Request) -> str | None:
+    token = request.cookies.get(COOKIE_NAME)
+    return valid_sessions.get(token) if token else None
 
 def require_auth(request: Request):
     """Redirect to login if not authenticated."""
@@ -45,23 +53,126 @@ def cleanup_temp_dir(path: str):
         except Exception as e:
             print(f"Failed to clean up temporary directory {path}: {e}")
 
+# ── DB & Password helpers ──────────────────────────────────────────────────────
+def get_db_connection():
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        db_url = "postgresql://postgres:Paris2025%24@161.35.119.223:5432/datalazo?sslmode=disable"
+    return psycopg2.connect(db_url)
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        parts = stored_hash.split(':')
+        if len(parts) != 2:
+            return False
+        salt, key_hex = parts
+        hashed_bytes = hashlib.scrypt(
+            password.encode('utf-8'),
+            salt=salt.encode('utf-8'),
+            n=16384,
+            r=8,
+            p=1,
+            dklen=64
+        )
+        key_bytes = bytes.fromhex(key_hex)
+        return hmac.compare_digest(hashed_bytes, key_bytes)
+    except Exception as e:
+        print(f"Password verification error: {e}")
+        return False
+
+def get_client_user(username: str) -> dict | None:
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('SELECT * FROM "ClientUser" WHERE username = %s;', (username,))
+            return cur.fetchone()
+    except Exception as e:
+        print(f"Database error fetching user: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+def update_terms_accepted(username: str, ip: str, user_agent: str) -> bool:
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            import datetime
+            now = datetime.datetime.now(datetime.timezone.utc)
+            cur.execute(
+                'UPDATE "ClientUser" SET "termsAccepted" = True, "termsAcceptedAt" = %s, "termsAcceptedIp" = %s, "termsAcceptedUserAgent" = %s WHERE username = %s;',
+                (now, ip, user_agent, username)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Database error updating terms: {e}")
+        return False
+    finally:
+        if conn:
+            conn.close()
+
 # ── Auth routes ────────────────────────────────────────────────────────────────
 @app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, error: str = ""):
+async def login_page(request: Request, error: str = "", username: str = ""):
     # Already logged in → go home
     if get_current_session(request):
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse(request=request, name="login.html", context={"error": error})
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"error": error, "username": username}
+    )
 
 @app.post("/login")
 async def login_submit(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    terms: str = Form(None)
 ):
-    if username.strip() == APP_USERNAME and password == APP_PASSWORD:
+    username_clean = username.strip()
+    
+    # 1. Try database client user authentication first
+    user = get_client_user(username_clean)
+    if user:
+        if verify_password(password, user["password"]):
+            # Check terms and conditions acceptance status
+            if not user.get("termsAccepted", False):
+                if not terms:
+                    return templates.TemplateResponse(
+                        request=request,
+                        name="login.html",
+                        context={
+                            "error": "You must accept the Terms and Conditions to proceed.",
+                            "username": username_clean
+                        },
+                        status_code=400
+                    )
+                else:
+                    client_ip = request.client.host if request.client else "unknown"
+                    user_agent = request.headers.get("user-agent", "")
+                    update_terms_accepted(username_clean, client_ip, user_agent)
+            
+            # Create session and redirect
+            token = secrets.token_urlsafe(32)
+            valid_sessions[token] = username_clean
+            response = RedirectResponse("/", status_code=302)
+            response.set_cookie(
+                key=COOKIE_NAME,
+                value=token,
+                httponly=True,
+                samesite="lax",
+                max_age=60 * 60 * 8,   # 8 hours
+            )
+            return response
+            
+    # 2. Fallback to default admin account
+    if username_clean == APP_USERNAME and password == APP_PASSWORD:
         token = secrets.token_urlsafe(32)
-        valid_sessions.add(token)
+        valid_sessions[token] = username_clean
         response = RedirectResponse("/", status_code=302)
         response.set_cookie(
             key=COOKIE_NAME,
@@ -71,11 +182,15 @@ async def login_submit(
             max_age=60 * 60 * 8,   # 8 hours
         )
         return response
+
     # Bad credentials
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"error": "Invalid email or password. Please try again."},
+        context={
+            "error": "Invalid email or password. Please try again.",
+            "username": username_clean
+        },
         status_code=401,
     )
 
@@ -83,7 +198,7 @@ async def login_submit(
 async def logout(request: Request):
     token = request.cookies.get(COOKIE_NAME)
     if token:
-        valid_sessions.discard(token)
+        valid_sessions.pop(token, None)
     response = RedirectResponse("/login", status_code=302)
     response.delete_cookie(COOKIE_NAME)
     return response
@@ -169,9 +284,10 @@ async def support_submit(
     
     subject = "Support Request - Bank Statement OCR Extractor"
     
+    current_user = get_current_username(request) or APP_USERNAME
     html_content = f"""
     <h3>Support Request</h3>
-    <p><strong>User:</strong> {APP_USERNAME}</p>
+    <p><strong>User:</strong> {current_user}</p>
     <p><strong>Message:</strong></p>
     <p>{message.replace(chr(10), '<br>')}</p>
     """
