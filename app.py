@@ -165,15 +165,32 @@ def record_user_usage(username: str, page_count: int):
             conn.close()
 
 # ── Auth routes ────────────────────────────────────────────────────────────────
+@app.get("/api/check-terms")
+async def check_terms(username: str = ""):
+    username_clean = username.strip()
+    if not username_clean:
+        return {"termsAccepted": False}
+    user = get_client_user(username_clean)
+    if user:
+        return {"termsAccepted": bool(user.get("termsAccepted", False))}
+    return {"termsAccepted": False}
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = "", username: str = ""):
     # Already logged in → go home
     if get_current_session(request):
         return RedirectResponse("/", status_code=302)
+    
+    terms_accepted = False
+    if username:
+        user = get_client_user(username.strip())
+        if user:
+            terms_accepted = bool(user.get("termsAccepted", False))
+
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"error": error, "username": username}
+        context={"error": error, "username": username, "terms_accepted": terms_accepted}
     )
 
 @app.post("/login")
@@ -197,7 +214,8 @@ async def login_submit(
                         name="login.html",
                         context={
                             "error": "You must accept the Terms and Conditions to proceed.",
-                            "username": username_clean
+                            "username": username_clean,
+                            "terms_accepted": False
                         },
                         status_code=400
                     )
@@ -234,12 +252,17 @@ async def login_submit(
         return response
 
     # Bad credentials
+    terms_accepted = False
+    if user:
+        terms_accepted = bool(user.get("termsAccepted", False))
+
     return templates.TemplateResponse(
         request=request,
         name="login.html",
         context={
             "error": "Invalid email or password. Please try again.",
-            "username": username_clean
+            "username": username_clean,
+            "terms_accepted": terms_accepted
         },
         status_code=401,
     )

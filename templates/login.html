@@ -459,7 +459,7 @@
                 </div>
                 <div class="field terms-field">
                     <label class="checkbox-container">
-                        <input type="checkbox" id="terms" name="terms">
+                        <input type="checkbox" id="terms" name="terms" {% if terms_accepted %}checked{% endif %}>
                         <span class="checkmark"></span>
                         <span class="label-text">
                             I accept the 
@@ -849,6 +849,37 @@
                     closeModal();
                 }
             });
+
+            // Dynamically check terms acceptance status when username changes or on load
+            const emailInput = document.getElementById('username');
+            const termsCheckbox = document.getElementById('terms');
+
+            async function checkTermsForEmail(email) {
+                if (!email) return;
+                try {
+                    const response = await fetch(`/api/check-terms?username=${encodeURIComponent(email.trim())}`);
+                    const data = await response.json();
+                    if (data.termsAccepted) {
+                        termsCheckbox.checked = true;
+                    }
+                } catch (e) {
+                    console.error('Error checking terms status:', e);
+                }
+            }
+
+            if (emailInput && termsCheckbox) {
+                emailInput.addEventListener('change', (e) => {
+                    checkTermsForEmail(e.target.value);
+                });
+                
+                emailInput.addEventListener('blur', (e) => {
+                    checkTermsForEmail(e.target.value);
+                });
+                
+                if (emailInput.value) {
+                    checkTermsForEmail(emailInput.value);
+                }
+            }
         });
     </script>
 </body>
