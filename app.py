@@ -307,9 +307,9 @@ async def process_pdf(
     try:
         result_data = run_extraction(pdf_path, temp_dir, create_csv=False)
         
-        # Record usage if logged in as a ClientUser (and not the fallback admin)
+        # Record usage if logged in as a ClientUser
         current_username = get_current_username(request)
-        if current_username and current_username != APP_USERNAME:
+        if current_username:
             import fitz
             try:
                 doc = fitz.open(pdf_path)
