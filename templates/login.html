@@ -282,10 +282,52 @@
             border: 1px solid var(--border-color);
             border-radius: 20px;
             width: 90%;
-            max-width: 500px;
+            max-width: 650px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             animation: modalFadeIn 0.3s ease-out;
             position: relative;
+        }
+
+        .modal-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px 8px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .tab-btn.active {
+            color: #a155ff;
+            border-bottom: 2px solid #a155ff;
+            background: rgba(161, 85, 255, 0.04);
+        }
+
+        .tab-content {
+            animation: fadeInTab 0.2s ease-out;
+        }
+
+        @keyframes fadeInTab {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         @keyframes modalFadeIn {
@@ -419,7 +461,13 @@
                     <label class="checkbox-container">
                         <input type="checkbox" id="terms" name="terms">
                         <span class="checkmark"></span>
-                        <span class="label-text">I accept the <a href="#" id="viewTermsLink">Terms and Conditions</a></span>
+                        <span class="label-text">
+                            I accept the 
+                            <a href="#" id="viewTermsLink">Terms and Conditions</a>, 
+                            <a href="#" id="viewPrivacyLink">Privacy Policy</a>, 
+                            <a href="#" id="viewRefundLink">Refund Policy</a>, and 
+                            <a href="#" id="viewSlaLink">SLA</a>.
+                        </span>
                     </label>
                 </div>
                 <button type="submit" class="btn-login" id="loginBtn">Sign In</button>
@@ -433,108 +481,304 @@
     <div id="termsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Terms and Conditions</h2>
+                <h2>Legal Agreements</h2>
                 <button class="close-btn" id="closeTermsBtn">&times;</button>
             </div>
+            
+            <div class="modal-tabs">
+                <button class="tab-btn active" data-tab="terms">Terms & Conditions</button>
+                <button class="tab-btn" data-tab="privacy">Privacy Policy</button>
+                <button class="tab-btn" data-tab="refund">Refund Policy</button>
+                <button class="tab-btn" data-tab="sla">SLA</button>
+            </div>
+
             <div class="modal-body">
-                <p>Welcome to the Bank Statement Extraction Platform, provided by Datalazo LLC.</p>
-                <p>By accessing or using our Service, you agree to comply with and be bound by the following terms:</p>
-                
-                <h3>1. Introduction</h3>
-                <p>These Terms and Conditions (“Terms”) govern the use of the Bank Statement Extraction Platform (“Service”), provided by Datalazo LLC (“Company”, “we”, “our”, “us”). By accessing or using the Service, the client (“Customer”, “you”, “your”) agrees to these Terms. If you do not agree, you may not use the Service.</p>
-                
-                <h3>2. Description of Service</h3>
-                <p>The Service includes:</p>
-                <ul>
-                    <li>Bank statement extraction using predefined templates</li>
-                    <li>OCR processing via Google Vision API</li>
-                    <li>Cloud based application access</li>
-                    <li>Data normalization and optional GL classification logic</li>
-                    <li>Optional custom template development</li>
-                </ul>
-                <p>The Service is provided as is, with no guarantee of compatibility with all bank formats or document types.</p>
-                
-                <h3>3. Onboarding Fees</h3>
-                <p>Customers agree to pay the onboarding fee associated with their selected plan:</p>
-                <ul>
-                    <li>Standard Plan: $3,000</li>
-                    <li>Flex Plan: $1,500</li>
-                    <li>Zero Entry Plan: $0</li>
-                </ul>
-                <p>Onboarding fees are non refundable, except where required by law.</p>
-                
-                <h3>4. Subscription Fees</h3>
-                <p>Monthly subscription fees apply based on the selected plan. Fees are billed automatically every month until canceled. Failure to pay may result in suspension or termination of access.</p>
-                
-                <h3>5. OCR Usage Limits</h3>
-                <p>Each plan includes a monthly quota of Google Vision OCR images. Additional usage is billed at the rate specified in the pricing page. OCR accuracy may vary depending on document quality, image resolution, and bank formatting. We do not guarantee 100% accuracy.</p>
-                
-                <h3>6. Bank Templates</h3>
-                <p>The Service includes 5 predefined bank templates. Additional templates may be purchased separately. Templates are designed based on typical bank formats but may require adjustments if the bank changes its layout. We are not responsible for changes made by banks to their statement formats.</p>
-                
-                <h3>7. Customer Responsibilities</h3>
-                <p>You agree to:</p>
-                <ul>
-                    <li>Provide accurate and lawful documents</li>
-                    <li>Use the Service only for legal purposes</li>
-                    <li>Maintain confidentiality of your login credentials</li>
-                    <li>Ensure compliance with your local financial regulations</li>
-                </ul>
-                <p>You are responsible for verifying extracted data before using it for accounting, tax, or financial reporting.</p>
-                
-                <h3>8. Data Ownership & Privacy</h3>
-                <p>You retain ownership of all data you upload.</p>
-                <p><strong>8.1 No Data Storage Policy:</strong> The Company does not store customer documents, images, or extracted data. Specifically:</p>
-                <ul>
-                    <li>All uploaded bank statements are processed in memory and destroyed immediately after extraction.</li>
-                    <li>No copies of documents, images, or extracted text are retained on Company servers.</li>
-                    <li>No customer financial data is stored in logs, databases, or backups.</li>
-                </ul>
-                <p><strong>8.2 Google Vision Temporary Processing:</strong> OCR processing is performed using Google Vision API. Google Vision may temporarily process the image for extraction, but the Company does not store the image before or after OCR, nor does the Company store the OCR output after delivering it to the Customer. All temporary processing files are destroyed immediately after extraction.</p>
-                <p><strong>8.3 No Data Retention:</strong> Because the Company does not store customer data, we cannot recover, restore, or re download any documents or extracted results once processing is complete.</p>
-                
-                <h3>9. Limitation of Liability</h3>
-                <p>To the maximum extent permitted by law:</p>
-                <ul>
-                    <li>We are not liable for financial losses, accounting errors, or decisions made based on extracted data.</li>
-                    <li>We are not liable for OCR inaccuracies or template misinterpretations.</li>
-                    <li>We are not liable for any loss of data, as the Service does not retain customer documents.</li>
-                    <li>Our total liability is limited to the amount paid by the Customer in the last 3 months.</li>
-                </ul>
-                <p>The Service is provided “as is” and “as available”.</p>
-                
-                <h3>10. No Professional Advice</h3>
-                <p>The Service does not provide accounting, tax, legal, or financial advice. You must consult qualified professionals before relying on extracted data.</p>
-                
-                <h3>11. Termination</h3>
-                <p>We may suspend or terminate access if payments fail, you violate these Terms, or you misuse the Service. You may cancel at any time, but no refunds are provided for partial months.</p>
-                
-                <h3>12. Intellectual Property</h3>
-                <p>All software, templates, algorithms, and documentation are owned by the Company. You may not copy, modify, reverse engineer, or redistribute any part of the Service.</p>
-                
-                <h3>13. Updates & Changes</h3>
-                <p>We may update the Service or these Terms at any time. Continued use after changes constitutes acceptance.</p>
-                
-                <h3>14. Governing Law</h3>
-                <p>These Terms are governed by the laws of the State of Florida, United States. Any disputes shall be resolved in courts located in Florida.</p>
-                
-                <h3>15. Service Discontinuation & Company Closure</h3>
-                <p>If the Company ceases operations or discontinues the Service:</p>
-                <ol>
-                    <li><strong>Notice:</strong> We will make reasonable efforts to provide 30 days’ notice.</li>
-                    <li><strong>Data Export:</strong> Because the Company does not store customer data, no data export will be available.</li>
-                    <li><strong>End of Service:</strong> All subscriptions will terminate automatically.</li>
-                    <li><strong>Refunds:</strong> Monthly and onboarding fees are non refundable. Annual plans may receive a pro rata refund at our discretion.</li>
-                    <li><strong>Liability:</strong> Our total liability is limited to the amount paid in the last 30 days.</li>
-                    <li><strong>Third Party Dependencies:</strong> If Google Vision or other required services become unavailable, the Company may discontinue the Service without liability.</li>
-                </ol>
-                
-                <h3>16. Contact Information</h3>
-                <p>For questions or legal notices:</p>
-                <p><strong>Datalazo LLC</strong><br>
-                7682 Tahiti Ln Apt 203, Lake Worth, FL 33467<br>
-                Email: luislazo@datalazo.net<br>
-                Phone: 862-223-6914</p>
+                <!-- Terms & Conditions Tab -->
+                <div class="tab-content" id="tab-terms">
+                    <p>Welcome to the Bank Statement Extraction Platform, provided by Datalazo LLC.</p>
+                    <p>By accessing or using our Service, you agree to comply with and be bound by the following terms:</p>
+                    
+                    <h3>1. Introduction</h3>
+                    <p>These Terms and Conditions (“Terms”) govern the use of the Bank Statement Extraction Platform (“Service”), provided by Datalazo LLC (“Company”, “we”, “our”, “us”). By accessing or using the Service, the client (“Customer”, “you”, “your”) agrees to these Terms. If you do not agree, you may not use the Service.</p>
+                    
+                    <h3>2. Description of Service</h3>
+                    <p>The Service includes:</p>
+                    <ul>
+                        <li>Bank statement extraction using predefined templates</li>
+                        <li>OCR processing via Google Vision API</li>
+                        <li>Cloud based application access</li>
+                        <li>Data normalization and optional GL classification logic</li>
+                        <li>Optional custom template development</li>
+                    </ul>
+                    <p>The Service is provided as is, with no guarantee of compatibility with all bank formats or document types.</p>
+                    
+                    <h3>3. Onboarding Fees</h3>
+                    <p>Customers agree to pay the onboarding fee associated with their selected plan:</p>
+                    <ul>
+                        <li>Standard Plan: $3,000</li>
+                        <li>Flex Plan: $1,500</li>
+                        <li>Zero Entry Plan: $0</li>
+                    </ul>
+                    <p>Onboarding fees are non refundable, except where required by law.</p>
+                    
+                    <h3>4. Subscription Fees</h3>
+                    <p>Monthly subscription fees apply based on the selected plan. Fees are billed automatically every month until canceled. Failure to pay may result in suspension or termination of access.</p>
+                    
+                    <h3>5. OCR Usage Limits</h3>
+                    <p>Each plan includes a monthly quota of Google Vision OCR images. Additional usage is billed at the rate specified in the pricing page. OCR accuracy may vary depending on document quality, image resolution, and bank formatting. We do not guarantee 100% accuracy.</p>
+                    
+                    <h3>6. Bank Templates</h3>
+                    <p>The Service includes 5 predefined bank templates. Additional templates may be purchased separately. Templates are designed based on typical bank formats but may require adjustments if the bank changes its layout. We are not responsible for changes made by banks to their statement formats.</p>
+                    
+                    <h3>7. Customer Responsibilities</h3>
+                    <p>You agree to:</p>
+                    <ul>
+                        <li>Provide accurate and lawful documents</li>
+                        <li>Use the Service only for legal purposes</li>
+                        <li>Maintain confidentiality of your login credentials</li>
+                        <li>Ensure compliance with your local financial regulations</li>
+                    </ul>
+                    <p>You are responsible for verifying extracted data before using it for accounting, tax, or financial reporting.</p>
+                    
+                    <h3>8. Data Ownership & Privacy</h3>
+                    <p>You retain ownership of all data you upload.</p>
+                    <p><strong>8.1 No Data Storage Policy:</strong> The Company does not store customer documents, images, or extracted data. Specifically:</p>
+                    <ul>
+                        <li>All uploaded bank statements are processed in memory and destroyed immediately after extraction.</li>
+                        <li>No copies of documents, images, or extracted text are retained on Company servers.</li>
+                        <li>No customer financial data is stored in logs, databases, or backups.</li>
+                    </ul>
+                    <p><strong>8.2 Google Vision Temporary Processing:</strong> OCR processing is performed using Google Vision API. Google Vision may temporarily process the image for extraction, but the Company does not store the image before or after OCR, nor does the Company store the OCR output after delivering it to the Customer. All temporary processing files are destroyed immediately after extraction.</p>
+                    <p><strong>8.3 No Data Retention:</strong> Because the Company does not store customer data, we cannot recover, restore, or re download any documents or extracted results once processing is complete.</p>
+                    
+                    <h3>9. Limitation of Liability</h3>
+                    <p>To the maximum extent permitted by law:</p>
+                    <ul>
+                        <li>We are not liable for financial losses, accounting errors, or decisions made based on extracted data.</li>
+                        <li>We are not liable for OCR inaccuracies or template misinterpretations.</li>
+                        <li>We are not liable for any loss of data, as the Service does not retain customer documents.</li>
+                        <li>Our total liability is limited to the amount paid by the Customer in the last 3 months.</li>
+                    </ul>
+                    <p>The Service is provided “as is” and “as available”.</p>
+                    
+                    <h3>10. No Professional Advice</h3>
+                    <p>The Service does not provide accounting, tax, legal, or financial advice. You must consult qualified professionals before relying on extracted data.</p>
+                    
+                    <h3>11. Termination</h3>
+                    <p>We may suspend or terminate access if payments fail, you violate these Terms, or you misuse the Service. You may cancel at any time, but no refunds are provided for partial months.</p>
+                    
+                    <h3>12. Intellectual Property</h3>
+                    <p>All software, templates, algorithms, and documentation are owned by the Company. You may not copy, modify, reverse engineer, or redistribute any part of the Service.</p>
+                    
+                    <h3>13. Updates & Changes</h3>
+                    <p>We may update the Service or these Terms at any time. Continued use after changes constitutes acceptance.</p>
+                    
+                    <h3>14. Governing Law</h3>
+                    <p>These Terms are governed by the laws of the State of Florida, United States. Any disputes shall be resolved in courts located in Florida.</p>
+                    
+                    <h3>15. Service Discontinuation & Company Closure</h3>
+                    <p>If the Company ceases operations or discontinues the Service:</p>
+                    <ol>
+                        <li><strong>Notice:</strong> We will make reasonable efforts to provide 30 days’ notice.</li>
+                        <li><strong>Data Export:</strong> Because the Company does not store customer data, no data export will be available.</li>
+                        <li><strong>End of Service:</strong> All subscriptions will terminate automatically.</li>
+                        <li><strong>Refunds:</strong> Monthly and onboarding fees are non refundable. Annual plans may receive a pro rata refund at our discretion.</li>
+                        <li><strong>Liability:</strong> Our total liability is limited to the amount paid in the last 30 days.</li>
+                        <li><strong>Third Party Dependencies:</strong> If Google Vision or other required services become unavailable, the Company may discontinue the Service without liability.</li>
+                    </ol>
+                    
+                    <h3>16. Contact Information</h3>
+                    <p>For questions or legal notices:</p>
+                    <p><strong>Datalazo LLC</strong><br>
+                    7682 Tahiti Ln Apt 203, Lake Worth, FL 33467<br>
+                    Email: luislazo@datalazo.net<br>
+                    Phone: 862-223-6914</p>
+                </div>
+
+                <!-- Privacy Policy Tab -->
+                <div class="tab-content" id="tab-privacy" style="display: none;">
+                    <p>Last Updated: July 2026</p>
+                    <h3>1. Introduction</h3>
+                    <p>This Privacy Policy explains how Datalazo LLC (“Company”, “we”, “our”, “us”) handles information when you use our Bank Statement Extraction Platform (“Service”). We are committed to protecting your privacy and being transparent about how data is processed.</p>
+                    <p>By using the Service, you agree to the practices described in this Privacy Policy.</p>
+                    
+                    <h3>2. Information We Collect</h3>
+                    <p>We collect only the minimum information required to operate the Service.</p>
+                    <p><strong>2.1 Account Information:</strong> When you create an account, we may collect:</p>
+                    <ul>
+                        <li>Name</li>
+                        <li>Email address</li>
+                        <li>Login credentials</li>
+                        <li>Company name (optional)</li>
+                    </ul>
+                    <p>This information is used solely to provide access to the Service.</p>
+                    <p><strong>2.2 Usage Information:</strong> We may collect basic technical information such as:</p>
+                    <ul>
+                        <li>IP address</li>
+                        <li>Browser type</li>
+                        <li>Device type</li>
+                        <li>Access timestamps</li>
+                        <li>Error logs</li>
+                    </ul>
+                    <p>This is standard for cloud applications and helps maintain system security and performance.</p>
+                    
+                    <h3>3. No Storage of Customer Documents</h3>
+                    <p><strong>3.1 No Document Retention:</strong> The Company does not store:</p>
+                    <ul>
+                        <li>Bank statements</li>
+                        <li>Images</li>
+                        <li>PDFs</li>
+                        <li>Extracted text</li>
+                        <li>OCR output</li>
+                        <li>Financial data</li>
+                        <li>Any uploaded documents</li>
+                    </ul>
+                    <p>All documents are processed in memory only and are destroyed immediately after extraction.</p>
+                    <p><strong>3.2 No Backup Copies:</strong> We do not save documents to disk, store them in databases, keep them in logs, retain them in backups, or archive any customer files. Once processing is complete, the data is permanently deleted.</p>
+                    
+                    <h3>4. OCR Processing via Google Vision</h3>
+                    <p>The Service uses Google Vision API to perform OCR extraction.</p>
+                    <p><strong>4.1 Temporary Processing:</strong> Google Vision may temporarily process the image to extract text. However:</p>
+                    <ul>
+                        <li>The Company does not store the image before or after OCR</li>
+                        <li>The Company does not store the OCR output</li>
+                        <li>Google Vision’s temporary processing files are destroyed automatically by Google</li>
+                        <li>No document or extracted data is retained by the Company</li>
+                    </ul>
+                    <p><strong>4.2 Customer Responsibility:</strong> You acknowledge that OCR accuracy may vary depending on document quality and formatting.</p>
+                    
+                    <h3>5. How We Use Account Information</h3>
+                    <p>We use account level information only for:</p>
+                    <ul>
+                        <li>Providing access to the Service</li>
+                        <li>Authentication</li>
+                        <li>Billing</li>
+                        <li>Customer support</li>
+                        <li>Security and fraud prevention</li>
+                        <li>Service improvements</li>
+                    </ul>
+                    <p>We do not use customer data for advertising, marketing, data resale, AI training, or profiling.</p>
+                    
+                    <h3>6. Sharing of Information</h3>
+                    <p>We do not sell, rent, or trade your information. We may share limited information only with Google Vision (for OCR processing), cloud hosting providers, payment processors, and legal authorities if required by law. These partners are required to follow strict data protection standards.</p>
+                    
+                    <h3>7. Data Security</h3>
+                    <p>Although we do not store customer documents, we still implement strong security measures for account information, including encrypted connections (HTTPS), secure authentication, access controls, and monitoring for suspicious activity.</p>
+                    
+                    <h3>8. Data Retention</h3>
+                    <p>Because we do not store customer documents or extracted data:</p>
+                    <ul>
+                        <li>We cannot recover or restore any processed files</li>
+                        <li>We cannot re download or re extract past documents</li>
+                        <li>You must keep your own copies of all documents and results</li>
+                    </ul>
+                    <p>Account information (email, login credentials, billing info) is retained only as long as your subscription is active or as required by law.</p>
+                    
+                    <h3>9. Children’s Privacy</h3>
+                    <p>The Service is not intended for individuals under 18. We do not knowingly collect information from minors.</p>
+                    
+                    <h3>10. Your Rights</h3>
+                    <p>Depending on your location, you may have rights such as access to your account information, correction of inaccurate information, deletion of your account, or requesting information about how your data is used. Since we do not store documents, these rights apply only to account level data.</p>
+                    
+                    <h3>11. Service Discontinuation</h3>
+                    <p>If the Company ceases operations, all accounts will be closed. No customer documents will be affected (none are stored). Account information may be deleted after legal retention periods, and no data export will be available. See our Terms & Conditions for full details.</p>
+                    
+                    <h3>12. Changes to This Privacy Policy</h3>
+                    <p>We may update this Privacy Policy from time to time. Continued use of the Service constitutes acceptance of any changes.</p>
+                </div>
+
+                <!-- Refund Policy Tab -->
+                <div class="tab-content" id="tab-refund" style="display: none;">
+                    <p>Last Updated: July 2026</p>
+                    <h3>1. Overview</h3>
+                    <p>This Refund Policy explains how Datalazo LLC (“Company”, “we”, “our”, “us”) handles refunds for onboarding fees, subscription payments, and additional services related to the Bank Statement Extraction Platform (“Service”).</p>
+                    <p>By subscribing to or using the Service, you agree to this Refund Policy.</p>
+                    
+                    <h3>2. Onboarding Fees (Non Refundable)</h3>
+                    <p>All onboarding fees are non refundable, including:</p>
+                    <ul>
+                        <li>Standard Plan onboarding ($3,000)</li>
+                        <li>Flex Plan onboarding ($1,500)</li>
+                        <li>Zero Entry Plan onboarding ($0)</li>
+                        <li>Custom template development</li>
+                        <li>Custom GL rule creation</li>
+                        <li>Any setup or configuration work</li>
+                    </ul>
+                    <p>Onboarding fees cover labor, template creation, system configuration, and initial deployment. Once onboarding begins, refunds are not available under any circumstances.</p>
+                    
+                    <h3>3. Monthly Subscription Fees (Non Refundable)</h3>
+                    <p>All monthly subscription payments are non refundable, including partial months, unused time, months where the Customer did not use the Service, and months where OCR quotas were not consumed.</p>
+                    <p>Subscription fees grant access to the cloud platform, OCR processing, and ongoing maintenance. Refunds are not provided once a billing cycle has started.</p>
+                    <p>Annual subscription payments are non refundable, except in the event the Company permanently discontinues the Service. In such cases, a pro rata refund may be issued at the Company’s discretion for the unused portion of the annual term.</p>
+                    
+                    <h3>4. Add Ons and Extra Usage</h3>
+                    <p>Payments for add ons or usage based services are non refundable, including additional bank templates, extra Google Vision OCR images, custom development, API usage fees, and priority support upgrades. These services are delivered immediately and cannot be reversed.</p>
+                    
+                    <h3>5. No Refunds for OCR Accuracy</h3>
+                    <p>OCR accuracy may vary depending on document quality, scanning resolution, bank formatting, image clarity, and PDF structure. Because OCR results depend on external factors, no refunds are provided for OCR errors, misreads, missing fields, incorrect extraction, or template mismatches. Customers are responsible for reviewing extracted data before using it for accounting or financial reporting.</p>
+                    
+                    <h3>6. No Refunds for Customer Mistakes</h3>
+                    <p>Refunds are not provided for uploading the wrong document, uploading corrupted or unreadable files, misconfigured templates, incorrect usage of the platform, or failure to understand how the Service works. Support is available to assist with proper usage.</p>
+                    
+                    <h3>7. Service Downtime</h3>
+                    <p>If the Service experiences downtime, no refunds are provided, no credits are issued, and no compensation is offered. However, the Company will make reasonable efforts to restore service promptly. If you want, we can add an SLA later that includes uptime guarantees.</p>
+                    
+                    <h3>8. Company Closure</h3>
+                    <p>If the Company permanently ceases operations, monthly subscriptions terminate immediately, onboarding fees remain non refundable, monthly fees remain non refundable, and annual plans may receive a pro rata refund at the Company’s discretion. Because the Company does not store customer documents, no data export will be available.</p>
+                    
+                    <h3>9. Chargebacks</h3>
+                    <p>Any chargeback initiated by the Customer will result in immediate suspension of the account, termination of access to all services, possible legal action to recover unpaid fees, and additional administrative fees. Customers must contact support before initiating a chargeback.</p>
+                </div>
+
+                <!-- SLA Tab -->
+                <div class="tab-content" id="tab-sla" style="display: none;">
+                    <h3>1. Introduction</h3>
+                    <p>This Service Level Agreement (“SLA”) describes the service performance standards provided by Datalazo LLC (“Company”, “we”, “our”, “us”) for the Bank Statement Extraction Platform (“Service”). This SLA forms part of the Terms & Conditions and applies to all subscribed Customers (“Customer”, “you”, “your”).</p>
+                    
+                    <h3>2. Service Availability</h3>
+                    <p>We aim to provide reliable access to the Service.</p>
+                    <p><strong>2.1 Uptime Commitment:</strong> The Company targets 99% uptime for the cloud application, excluding scheduled maintenance, emergency maintenance, outages caused by third party providers, outages caused by Google Vision API, customer side network or device issues, and force majeure events. This uptime target is not a guarantee, but a reasonable effort standard.</p>
+                    
+                    <h3>3. Scheduled Maintenance</h3>
+                    <p>We may perform scheduled maintenance to improve or update the Service.</p>
+                    <p><strong>3.1 Notice:</strong> Scheduled maintenance will be announced at least 24 hours in advance. Maintenance is typically performed during low traffic hours.</p>
+                    <p><strong>3.2 Impact:</strong> During maintenance, the Service may be temporarily unavailable.</p>
+                    
+                    <h3>4. OCR Processing Performance</h3>
+                    <p>OCR extraction is performed using Google Vision API.</p>
+                    <p><strong>4.1 Processing Time:</strong> Typical OCR processing time is 1–10 seconds per document, depending on document size, image quality, bank formatting, and Google Vision API response time.</p>
+                    <p><strong>4.2 OCR Accuracy:</strong> OCR accuracy varies based on document quality. The Company does not guarantee 100% accuracy, perfect extraction, correct interpretation of bank formats, or correct GL classification. Customers must verify extracted data before using it for accounting or financial reporting.</p>
+                    
+                    <h3>5. Support Response Times</h3>
+                    <p>We provide support based on your subscription plan.</p>
+                    <p><strong>5.1 Standard Support (Flex & Zero Entry Plans):</strong> Response within 48 hours, email support only.</p>
+                    <p><strong>5.2 Priority Support (Standard Plan):</strong> Response within 24 hours, email + optional live session scheduling.</p>
+                    <p><strong>5.3 Support Limitations:</strong> Support does not include accounting advice, financial interpretation, custom development unless purchased, or bank template redesign unless purchased.</p>
+                    
+                    <h3>6. Data Handling & Security</h3>
+                    <p><strong>6.1 No Data Storage:</strong> The Company does not store bank statements, images, PDFs, extracted text, OCR output, or financial data. All documents are processed in memory and destroyed immediately after extraction.</p>
+                    <p><strong>6.2 Security Measures:</strong> We implement reasonable security measures for account access, authentication, and cloud infrastructure. Because no documents are stored, data breach risk is significantly reduced.</p>
+                    
+                    <h3>7. Service Limitations</h3>
+                    <p>The Service may be affected by changes in bank statement formats, poor document quality, Google Vision API outages, internet connectivity issues, and customer misconfiguration. The Company is not responsible for failures caused by these factors.</p>
+                    
+                    <h3>8. Third Party Dependencies</h3>
+                    <p>The Service relies on Google Vision API (OCR), cloud hosting providers, and payment processors. Outages or disruptions caused by third party services are outside the Company’s control and do not constitute SLA violations.</p>
+                    
+                    <h3>9. Remedies</h3>
+                    <p>Because the Service does not store customer data and operates on a subscription basis:</p>
+                    <p><strong>9.1 No Financial Credits:</strong> The Company does not offer service credits, refunds, compensation, or penalties for downtime, OCR errors, or service interruptions.</p>
+                    <p><strong>9.2 Best Effort Restoration:</strong> If an outage occurs, the Company will make reasonable efforts to restore service promptly.</p>
+                    
+                    <h3>10. Customer Responsibilities</h3>
+                    <p>Customers must provide readable documents, maintain their own internet connection, use supported file formats, verify extracted data, and keep login credentials secure. The Company is not responsible for errors caused by customer misuse.</p>
+                    
+                    <h3>11. Service Discontinuation</h3>
+                    <p>If the Company ceases operations, all subscriptions terminate. No data export is available (no data stored). Annual plans may receive pro rata refunds at the Company’s discretion. See Terms & Conditions for full details.</p>
+                    
+                    <h3>12. Changes to SLA</h3>
+                    <p>The Company may update this SLA at any time. Continued use of the Service constitutes acceptance of any changes.</p>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-modal-close" id="closeTermsBtn2">Close</button>
@@ -545,13 +789,52 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const modal = document.getElementById('termsModal');
-            const viewLink = document.getElementById('viewTermsLink');
             const closeBtn = document.getElementById('closeTermsBtn');
             const closeBtn2 = document.getElementById('closeTermsBtn2');
 
-            viewLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                modal.style.display = 'flex';
+            const links = [
+                { id: 'viewTermsLink', tab: 'terms' },
+                { id: 'viewPrivacyLink', tab: 'privacy' },
+                { id: 'viewRefundLink', tab: 'refund' },
+                { id: 'viewSlaLink', tab: 'sla' }
+            ];
+
+            links.forEach(item => {
+                const el = document.getElementById(item.id);
+                if (el) {
+                    el.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        switchTab(item.tab);
+                        modal.style.display = 'flex';
+                    });
+                }
+            });
+
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            function switchTab(tabId) {
+                tabButtons.forEach(btn => {
+                    if (btn.getAttribute('data-tab') === tabId) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+
+                tabContents.forEach(content => {
+                    if (content.id === `tab-${tabId}`) {
+                        content.style.display = 'block';
+                    } else {
+                        content.style.display = 'none';
+                    }
+                });
+            }
+
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    switchTab(btn.getAttribute('data-tab'));
+                });
             });
 
             const closeModal = () => {
