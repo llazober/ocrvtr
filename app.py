@@ -27,6 +27,33 @@ COOKIE_NAME  = "ocr_session"
 # In-memory dict of valid sessions mapping token -> username (cleared on restart)
 valid_sessions: dict[str, str] = {}
 
+# ── Dynamic CSV Export Layout Config ───────────────────────────────────────────
+DEFAULT_CSV_MAPPING = {
+    "headers": ["Type", "Date", "Entity Code", "Account", "Debit", "Credit", "Description", "Reference"],
+    "fields": [
+        {"header": "Type", "type": "constant", "value": "GJ"},
+        {"header": "Date", "type": "field", "source": "date"},
+        {"header": "Entity Code", "type": "constant", "value": ""},
+        {"header": "Account", "type": "account_mapping", "debit_value": "260", "credit_value": "500"},
+        {"header": "Debit", "type": "debit"},
+        {"header": "Credit", "type": "credit"},
+        {"header": "Description", "type": "field", "source": "description", "max_length": 98},
+        {"header": "Reference", "type": "reference"}
+    ]
+}
+
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datalazo.config.json")
+def load_config() -> dict:
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading config: {e}")
+    return {}
+
+APP_CONFIG = load_config()
+
 def get_current_session(request: Request) -> str | None:
     token = request.cookies.get(COOKIE_NAME)
     return token if token in valid_sessions else None
@@ -113,6 +140,31 @@ def update_terms_accepted(username: str, ip: str, user_agent: str) -> bool:
     finally:
         if conn:
             conn.close()
+
+def get_client_subdomain(username: str) -> str:
+    user = get_client_user(username)
+    if not user:
+        return "vrt.datalazo.net"
+    
+    client_id = user.get("clientId")
+    if not client_id:
+        return "vrt.datalazo.net"
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('SELECT subdomain FROM "Client" WHERE id = %s;', (client_id,))
+            client = cur.fetchone()
+            if client and client.get("subdomain"):
+                return client.get("subdomain").strip()
+    except Exception as e:
+        print(f"Database error fetching client subdomain: {e}")
+    finally:
+        if conn:
+            conn.close()
+            
+    return "vrt.datalazo.net"
 
 def record_user_usage(username: str, page_count: int):
     conn = None
@@ -279,9 +331,22 @@ async def logout(request: Request):
 # ── Protected routes ───────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
-    if not get_current_session(request):
+    username = get_current_username(request)
+    if not username:
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse(request=request, name="index.html")
+        
+    subdomain = get_client_subdomain(username)
+    clients_config = APP_CONFIG.get("clients", {})
+    client_conf = clients_config.get(subdomain) or clients_config.get("vrt.datalazo.net", {})
+    
+    if not client_conf or "csv_mapping" not in client_conf:
+        client_conf = {"csv_mapping": DEFAULT_CSV_MAPPING}
+        
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={"client_config": client_conf}
+    )
 
 @app.post("/process")
 async def process_pdf(

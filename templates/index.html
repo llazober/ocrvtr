@@ -699,6 +699,7 @@
     </div>
 
     <script>
+        window.CLIENT_CONFIG = {{ client_config | tojson | safe }};
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const fileInfoBox = document.getElementById('fileInfoBox');
@@ -998,9 +999,8 @@
             if (!currentResult || !currentResult.transactions || currentResult.transactions.length === 0) return;
             
             try {
-                // Fixed column order with renamed headers:
-                // Type | Date | Entity Code | Account | Debit (Deposits) | Credit (Withdrawals) | Description | Reference (Check #)
-                const csvHeaders = ['Type', 'Date', 'Entity Code', 'Account', 'Debit', 'Credit', 'Description', 'Reference'];
+                const mapping = window.CLIENT_CONFIG.csv_mapping;
+                const csvHeaders = mapping.headers;
                 const csvRows = [csvHeaders.join(',')];
 
                 function csvEscape(val) {
@@ -1013,33 +1013,29 @@
                 }
 
                 currentResult.transactions.forEach(tx => {
-                    // Determine Account: 260 for Debit (has Deposits value), 500 for Credit (has Withdrawals value)
                     const hasDebit  = tx.Deposits  !== null && tx.Deposits  !== undefined && tx.Deposits  !== '';
                     const hasCredit = tx.Withdrawals !== null && tx.Withdrawals !== undefined && tx.Withdrawals !== '';
-                    const accountVal = hasDebit ? '260' : (hasCredit ? '500' : '');
 
-                    // Truncate description to 98 chars
-                    let desc = tx.description !== null && tx.description !== undefined ? String(tx.description) : '';
-                    if (desc.length >= 99) desc = desc.substring(0, 98);
-
-                    // Debit value (Deposits field)
-                    const debitVal  = hasDebit  ? String(tx.Deposits)    : '';
-                    // Credit value (Withdrawals field)
-                    const creditVal = hasCredit ? String(tx.Withdrawals) : '';
-
-                    // Reference (Check #)
-                    const checkNum = tx.checknumber !== null && tx.checknumber !== undefined && !isNaN(tx.checknumber) && tx.checknumber !== '' ? String(tx.checknumber) : '';
-
-                    const row = [
-                        csvEscape('GJ'),           // Type
-                        csvEscape(tx.date || ''),  // Date
-                        '',                        // Entity Code (always empty)
-                        csvEscape(accountVal),     // Account
-                        csvEscape(debitVal),       // Debit (Deposits)
-                        csvEscape(creditVal),      // Credit (Withdrawals)
-                        csvEscape(desc),           // Description
-                        csvEscape(checkNum)        // Reference (Check #)
-                    ];
+                    const row = mapping.fields.map(f => {
+                        let val = '';
+                        if (f.type === 'constant') {
+                            val = f.value;
+                        } else if (f.type === 'field') {
+                            val = tx[f.source] !== null && tx[f.source] !== undefined ? String(tx[f.source]) : '';
+                            if (f.max_length && val.length > f.max_length) {
+                                val = val.substring(0, f.max_length);
+                            }
+                        } else if (f.type === 'account_mapping') {
+                            val = hasDebit ? f.debit_value : (hasCredit ? f.credit_value : '');
+                        } else if (f.type === 'debit') {
+                            val = hasDebit ? String(tx.Deposits) : '';
+                        } else if (f.type === 'credit') {
+                            val = hasCredit ? String(tx.Withdrawals) : '';
+                        } else if (f.type === 'reference') {
+                            val = tx.checknumber !== null && tx.checknumber !== undefined && !isNaN(tx.checknumber) && tx.checknumber !== '' ? String(tx.checknumber) : '';
+                        }
+                        return csvEscape(val);
+                    });
                     csvRows.push(row.join(','));
                 });
                 

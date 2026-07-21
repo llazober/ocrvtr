@@ -12,6 +12,7 @@ env/
 
 # Keys / credentials - NEVER commit these
 *.json
+!datalazo.config.json
 !requirements*.txt
 
 # Temp files
