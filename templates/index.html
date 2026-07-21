@@ -334,6 +334,13 @@
 </head>
 <body>
 
+    <div style="position: absolute; top: 24px; left: 24px; display: flex; align-items: center; gap: 8px; z-index: 100; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); font-family: 'Plus Jakarta Sans', sans-serif;">
+        <span style="background: rgba(22, 26, 37, 0.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 14px; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+            <span style="width: 6px; height: 6px; background-color: var(--success-color); border-radius: 50%; box-shadow: 0 0 8px var(--success-color);"></span>
+            <strong style="color: #fff;">{{ company_name }}</strong> <span style="opacity: 0.3; color: var(--text-muted);">|</span> <span style="color: var(--text-muted);">{{ username }}</span>
+        </span>
+    </div>
+
     <div style="position: absolute; top: 24px; right: 24px; display: flex; gap: 12px; z-index: 100;">
         <button id="supportBtn" style="
             font-size: 0.78rem; font-weight: 600;

@@ -366,6 +366,26 @@ async def read_index(request: Request):
     if not username:
         return RedirectResponse("/login", status_code=302)
         
+    company_name = None
+    if username == APP_USERNAME:
+        company_name = "Datalazo Admin"
+    else:
+        user = get_client_user(username)
+        if user and user.get("clientId"):
+            conn = None
+            try:
+                conn = get_db_connection()
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('SELECT company, name FROM "Client" WHERE id = %s;', (user["clientId"],))
+                    client = cur.fetchone()
+                    if client:
+                        company_name = client.get("company") or client.get("name")
+            except Exception as e:
+                print(f"Error fetching client info: {e}")
+            finally:
+                if conn:
+                    conn.close()
+
     subdomain = get_client_subdomain(username)
     clients_config = APP_CONFIG.get("clients", {})
     client_conf = clients_config.get(subdomain) or clients_config.get("vrt.datalazo.net", {})
@@ -376,7 +396,11 @@ async def read_index(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"client_config": client_conf}
+        context={
+            "client_config": client_conf,
+            "username": username,
+            "company_name": company_name or "Datalazo Partner"
+        }
     )
 
 @app.post("/process")
