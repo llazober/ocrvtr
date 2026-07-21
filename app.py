@@ -216,6 +216,23 @@ def record_user_usage(username: str, page_count: int):
         if conn:
             conn.close()
 
+def record_login(username: str, site: str, ip: str, user_agent: str):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                'INSERT INTO "LoginLog" (username, site, "ipAddress", "userAgent") VALUES (%s, %s, %s, %s);',
+                (username, site, ip, user_agent)
+            )
+            conn.commit()
+            print(f"Recorded login log for {username} from {ip} on site {site}")
+    except Exception as e:
+        print(f"Database error recording login: {e}")
+    finally:
+        if conn:
+            conn.close()
+
 # ── Auth routes ────────────────────────────────────────────────────────────────
 @app.get("/api/check-terms")
 async def check_terms(username: str = ""):
@@ -279,6 +296,13 @@ async def login_submit(
             # Create session and redirect
             token = secrets.token_urlsafe(32)
             valid_sessions[token] = username_clean
+            
+            # Record login log
+            client_ip = request.client.host if request.client else "unknown"
+            user_agent = request.headers.get("user-agent", "")
+            site_host = request.headers.get("host", "")
+            record_login(username_clean, site_host, client_ip, user_agent)
+            
             response = RedirectResponse("/", status_code=302)
             response.set_cookie(
                 key=COOKIE_NAME,
@@ -293,6 +317,13 @@ async def login_submit(
     if username_clean == APP_USERNAME and password == APP_PASSWORD:
         token = secrets.token_urlsafe(32)
         valid_sessions[token] = username_clean
+        
+        # Record login log
+        client_ip = request.client.host if request.client else "unknown"
+        user_agent = request.headers.get("user-agent", "")
+        site_host = request.headers.get("host", "")
+        record_login(username_clean, site_host, client_ip, user_agent)
+        
         response = RedirectResponse("/", status_code=302)
         response.set_cookie(
             key=COOKIE_NAME,
