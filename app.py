@@ -367,24 +367,27 @@ async def read_index(request: Request):
         return RedirectResponse("/login", status_code=302)
         
     company_name = None
-    if username == APP_USERNAME:
-        company_name = "Datalazo Admin"
-    else:
-        user = get_client_user(username)
-        if user and user.get("clientId"):
-            conn = None
-            try:
-                conn = get_db_connection()
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute('SELECT company, name FROM "Client" WHERE id = %s;', (user["clientId"],))
-                    client = cur.fetchone()
-                    if client:
-                        company_name = client.get("company") or client.get("name")
-            except Exception as e:
-                print(f"Error fetching client info: {e}")
-            finally:
-                if conn:
-                    conn.close()
+    user = get_client_user(username)
+    if user and user.get("clientId"):
+        conn = None
+        try:
+            conn = get_db_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('SELECT company, name FROM "Client" WHERE id = %s;', (user["clientId"],))
+                client = cur.fetchone()
+                if client:
+                    company_name = client.get("company") or client.get("name")
+        except Exception as e:
+            print(f"Error fetching client info: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    if not company_name:
+        if username == APP_USERNAME or username.lower() == "admin@vrtservices12.com":
+            company_name = "VRT Services"
+        else:
+            company_name = "Datalazo Partner"
 
     subdomain = get_client_subdomain(username)
     clients_config = APP_CONFIG.get("clients", {})
