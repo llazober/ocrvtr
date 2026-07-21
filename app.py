@@ -321,6 +321,9 @@ async def process_pdf(
                 
         background_tasks.add_task(cleanup_temp_dir, temp_dir)
         return result_data
+    except ValueError as ve:
+        cleanup_temp_dir(temp_dir)
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         cleanup_temp_dir(temp_dir)
         raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")

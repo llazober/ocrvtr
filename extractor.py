@@ -402,7 +402,7 @@ def detect_bank(p1_words):
         return 'TRUIST'
     elif 'pnc' in all_text:
         return 'PNC'
-    return 'PNC'
+    return None
 
 def clean_amount(val_str):
     if not val_str:
@@ -1633,6 +1633,8 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
         
     p1_words = ocr_page_to_words(client, p1_png)
     bank_type = detect_bank(p1_words)
+    if not bank_type:
+        raise ValueError("The uploaded document is not a supported bank statement. Please upload a Wells Fargo, Bank of America, TD Bank, Truist, or PNC statement.")
     print(f"\n--> DETECTED BANK: {bank_type}")
     
     bus_name = extract_business_name(p1_words)
