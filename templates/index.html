@@ -330,18 +330,51 @@
             color: var(--text-muted);
             font-size: 0.85rem;
         }
+
+        .user-bar-left {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 100;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .user-bar-right {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        @media (max-width: 768px) {
+            .user-bar-left, .user-bar-right {
+                position: static !important;
+                justify-content: center;
+                margin-bottom: 12px;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div style="position: absolute; top: 24px; left: 24px; display: flex; align-items: center; gap: 8px; z-index: 100; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); font-family: 'Plus Jakarta Sans', sans-serif;">
-        <span style="background: rgba(22, 26, 37, 0.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 14px; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
-            <span style="width: 6px; height: 6px; background-color: var(--success-color); border-radius: 50%; box-shadow: 0 0 8px var(--success-color);"></span>
-            <strong style="color: #fff;">{{ company_name }}</strong> <span style="opacity: 0.3; color: var(--text-muted);">|</span> <span style="color: var(--text-muted);">{{ username }}</span>
+    <div class="user-bar-left">
+        <span style="background: rgba(22, 26, 37, 0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--border-color); border-radius: 20px; padding: 7px 16px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);">
+            <span style="width: 7px; height: 7px; background-color: var(--success-color); border-radius: 50%; box-shadow: 0 0 8px var(--success-color);"></span>
+            <strong style="color: #fff; font-weight: 700;">{{ company_name }}</strong>
+            <span style="opacity: 0.25; color: var(--text-muted);">|</span>
+            <span style="color: var(--text-muted); font-weight: 400;">{{ username }}</span>
         </span>
     </div>
 
-    <div style="position: absolute; top: 24px; right: 24px; display: flex; gap: 12px; z-index: 100;">
+    <div class="user-bar-right">
         <button id="supportBtn" style="
             font-size: 0.78rem; font-weight: 600;
             color: var(--text-muted);
