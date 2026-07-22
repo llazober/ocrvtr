@@ -24,6 +24,34 @@ app = FastAPI(title="Bank Statement OCR Extractor")
 APP_USERNAME = os.environ.get("APP_USERNAME", "admin@vrtservices12.com")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "hon12345")
 COOKIE_NAME  = "ocr_session"
+
+# ── Dynamic CSV Export Layout Config ───────────────────────────────────────────
+DEFAULT_CSV_MAPPING = {
+    "headers": ["Type", "Date", "Entity Code", "Account", "Debit", "Credit", "Description", "Reference"],
+    "fields": [
+        {"header": "Type", "type": "constant", "value": "GJ"},
+        {"header": "Date", "type": "field", "source": "date"},
+        {"header": "Entity Code", "type": "constant", "value": ""},
+        {"header": "Account", "type": "account_mapping", "debit_value": "260", "credit_value": "500"},
+        {"header": "Debit", "type": "debit"},
+        {"header": "Credit", "type": "credit"},
+        {"header": "Description", "type": "field", "source": "description", "max_length": 98},
+        {"header": "Reference", "type": "reference"}
+    ]
+}
+
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datalazo.config.json")
+def load_config() -> dict:
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading config: {e}")
+    return {}
+
+APP_CONFIG = load_config()
+
 # Session tracking:
 # valid_sessions: token -> {"username": str}
 # active_user_tokens: username -> token (Enforces single active instance per user)
