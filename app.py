@@ -913,6 +913,28 @@ async def qbo_status(request: Request):
     access_token, realm_id = get_valid_qbo_access_token(client_id_key)
     return {"connected": bool(access_token and realm_id), "realm_id": realm_id or ""}
 
+def parse_to_qbo_date(date_str: str) -> str:
+    import datetime, re
+    if not date_str:
+        return datetime.date.today().strftime("%Y-%m-%d")
+    date_str = str(date_str).strip()
+    
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%d/%m/%Y", "%d/%m/%y", "%b %d, %Y", "%B %d, %Y"):
+        try:
+            dt = datetime.datetime.strptime(date_str, fmt)
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+            
+    match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})', date_str)
+    if match:
+        m, d, y = match.groups()
+        if len(y) == 2:
+            y = "20" + y
+        return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+
+    return datetime.date.today().strftime("%Y-%m-%d")
+
 @app.post("/api/qbo/export")
 async def export_to_qbo(request: Request):
     username = get_current_username(request)
@@ -936,111 +958,129 @@ async def export_to_qbo(request: Request):
     if not debit_acc or not credit_acc:
         raise HTTPException(status_code=400, detail="Could not resolve Chart of Accounts in QuickBooks Online.")
 
-    lines = []
+    # Group transactions by transaction date (TxnDate)
+    tx_by_date = {}
     for tx in transactions:
-        dep = tx.get("Deposits")
-        withd = tx.get("Withdrawals")
-        desc = tx.get("description", "Bank Statement Transaction")
-        if not desc:
-            desc = "Bank Statement Transaction"
-        desc = str(desc)[:100]
+        qbo_date = parse_to_qbo_date(tx.get("date"))
+        if qbo_date not in tx_by_date:
+            tx_by_date[qbo_date] = []
+        tx_by_date[qbo_date].append(tx)
 
-        has_debit = dep is not None and dep != ""
-        has_credit = withd is not None and withd != ""
-
-        if has_debit:
-            amt = float(dep)
-            lines.append({
-                "Description": desc,
-                "Amount": amt,
-                "DetailType": "JournalEntryLineDetail",
-                "JournalEntryLineDetail": {
-                    "PostingType": "Debit",
-                    "AccountRef": {
-                        "value": str(debit_acc["Id"]),
-                        "name": str(debit_acc.get("Name", "Debit Account"))
-                    }
-                }
-            })
-            lines.append({
-                "Description": desc,
-                "Amount": amt,
-                "DetailType": "JournalEntryLineDetail",
-                "JournalEntryLineDetail": {
-                    "PostingType": "Credit",
-                    "AccountRef": {
-                        "value": str(credit_acc["Id"]),
-                        "name": str(credit_acc.get("Name", "Credit Account"))
-                    }
-                }
-            })
-        elif has_credit:
-            amt = float(withd)
-            lines.append({
-                "Description": desc,
-                "Amount": amt,
-                "DetailType": "JournalEntryLineDetail",
-                "JournalEntryLineDetail": {
-                    "PostingType": "Credit",
-                    "AccountRef": {
-                        "value": str(debit_acc["Id"]),
-                        "name": str(debit_acc.get("Name", "Debit Account"))
-                    }
-                }
-            })
-            lines.append({
-                "Description": desc,
-                "Amount": amt,
-                "DetailType": "JournalEntryLineDetail",
-                "JournalEntryLineDetail": {
-                    "PostingType": "Debit",
-                    "AccountRef": {
-                        "value": str(credit_acc["Id"]),
-                        "name": str(credit_acc.get("Name", "Credit Account"))
-                    }
-                }
-            })
-
-    if not lines:
-        raise HTTPException(status_code=400, detail="No valid transactions with deposit/withdrawal amounts found.")
-
-    qbo_payload = {
-        "Line": lines
-    }
-
+    created_ids = []
     base_url = get_qbo_api_base_url(realm_id)
     post_url = f"{base_url}/journalentry?minorversion=65"
 
-    req = urllib.request.Request(
-        post_url,
-        data=json.dumps(qbo_payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        },
-        method="POST"
-    )
+    for qbo_date, tx_list in tx_by_date.items():
+        lines = []
+        for tx in tx_list:
+            dep = tx.get("Deposits")
+            withd = tx.get("Withdrawals")
+            desc = tx.get("description", "Bank Statement Transaction")
+            if not desc:
+                desc = "Bank Statement Transaction"
+            desc = str(desc)[:100]
 
-    try:
-        with urllib.request.urlopen(req) as resp:
-            resp_data = json.loads(resp.read().decode("utf-8"))
-            je = resp_data.get("JournalEntry", {})
-            je_id = je.get("Id", "Created")
-            return {
-                "success": True,
-                "journal_entry_id": je_id,
-                "message": f"Successfully created Journal Entry #{je_id} in QuickBooks Online!",
-                "debit_account": debit_acc.get("Name"),
-                "credit_account": credit_acc.get("Name")
-            }
-    except urllib.error.HTTPError as he:
-        err_body = he.read().decode("utf-8")
-        print(f"QBO API Error: {err_body}")
-        raise HTTPException(status_code=400, detail=f"QuickBooks API Error: {err_body}")
-    except Exception as e:
-        print(f"Error posting to QBO: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to post to QuickBooks Online: {e}")
+            has_debit = dep is not None and dep != ""
+            has_credit = withd is not None and withd != ""
+
+            if has_debit:
+                amt = float(dep)
+                lines.append({
+                    "Description": desc,
+                    "Amount": amt,
+                    "DetailType": "JournalEntryLineDetail",
+                    "JournalEntryLineDetail": {
+                        "PostingType": "Debit",
+                        "AccountRef": {
+                            "value": str(debit_acc["Id"]),
+                            "name": str(debit_acc.get("Name", "Debit Account"))
+                        }
+                    }
+                })
+                lines.append({
+                    "Description": desc,
+                    "Amount": amt,
+                    "DetailType": "JournalEntryLineDetail",
+                    "JournalEntryLineDetail": {
+                        "PostingType": "Credit",
+                        "AccountRef": {
+                            "value": str(credit_acc["Id"]),
+                            "name": str(credit_acc.get("Name", "Credit Account"))
+                        }
+                    }
+                })
+            elif has_credit:
+                amt = float(withd)
+                lines.append({
+                    "Description": desc,
+                    "Amount": amt,
+                    "DetailType": "JournalEntryLineDetail",
+                    "JournalEntryLineDetail": {
+                        "PostingType": "Credit",
+                        "AccountRef": {
+                            "value": str(debit_acc["Id"]),
+                            "name": str(debit_acc.get("Name", "Debit Account"))
+                        }
+                    }
+                })
+                lines.append({
+                    "Description": desc,
+                    "Amount": amt,
+                    "DetailType": "JournalEntryLineDetail",
+                    "JournalEntryLineDetail": {
+                        "PostingType": "Debit",
+                        "AccountRef": {
+                            "value": str(credit_acc["Id"]),
+                            "name": str(credit_acc.get("Name", "Credit Account"))
+                        }
+                    }
+                })
+
+        if not lines:
+            continue
+
+        qbo_payload = {
+            "TxnDate": qbo_date,
+            "Line": lines
+        }
+
+        req = urllib.request.Request(
+            post_url,
+            data=json.dumps(qbo_payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            method="POST"
+        )
+
+        try:
+            with urllib.request.urlopen(req) as resp:
+                resp_data = json.loads(resp.read().decode("utf-8"))
+                je = resp_data.get("JournalEntry", {})
+                je_id = je.get("Id")
+                if je_id:
+                    created_ids.append(str(je_id))
+        except urllib.error.HTTPError as he:
+            err_body = he.read().decode("utf-8")
+            print(f"QBO API Error: {err_body}")
+            raise HTTPException(status_code=400, detail=f"QuickBooks API Error: {err_body}")
+        except Exception as e:
+            print(f"Error posting to QBO: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to post to QuickBooks Online: {e}")
+
+    if not created_ids:
+        raise HTTPException(status_code=400, detail="No valid Journal Entries could be created in QuickBooks.")
+
+    id_str = ", #".join(created_ids)
+    return {
+        "success": True,
+        "journal_entry_ids": created_ids,
+        "message": f"Successfully created Journal Entry #{id_str} in QuickBooks Online!",
+        "debit_account": debit_acc.get("Name"),
+        "credit_account": credit_acc.get("Name")
+    }
 
 @app.post("/process")
 async def process_pdf(
