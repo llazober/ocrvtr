@@ -1,6 +1,6 @@
 {
-  "clients": {
-    "vrt.datalazo.net": {
+  "software": {
+    "Drake": {
       "csv_mapping": {
         "headers": ["Type", "Date", "Entity Code", "Account", "Debit", "Credit", "Description", "Reference"],
         "fields": [
@@ -46,7 +46,53 @@
         ]
       }
     },
-    "datalazo.net": {
+    "QBO": {
+      "csv_mapping": {
+        "headers": ["Type", "Date", "Entity Code", "Account", "Debit", "Credit", "Description", "Reference"],
+        "fields": [
+          {
+            "header": "Type",
+            "type": "constant",
+            "value": "GJ"
+          },
+          {
+            "header": "Date",
+            "type": "field",
+            "source": "date"
+          },
+          {
+            "header": "Entity Code",
+            "type": "constant",
+            "value": ""
+          },
+          {
+            "header": "Account",
+            "type": "account_mapping",
+            "debit_value": "260",
+            "credit_value": "500"
+          },
+          {
+            "header": "Debit",
+            "type": "debit"
+          },
+          {
+            "header": "Credit",
+            "type": "credit"
+          },
+          {
+            "header": "Description",
+            "type": "field",
+            "source": "description",
+            "max_length": 98
+          },
+          {
+            "header": "Reference",
+            "type": "reference"
+          }
+        ]
+      }
+    },
+    "Default": {
       "csv_mapping": {
         "headers": ["Type", "Date", "Entity Code", "Account", "Debit", "Credit", "Description", "Reference"],
         "fields": [

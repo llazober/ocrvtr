@@ -530,16 +530,26 @@ async def read_index(request: Request):
         return response
 
     company_name = None
+    software_name = None
     user = get_client_user(username)
     if user and user.get("clientId"):
         conn = None
         try:
             conn = get_db_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute('SELECT company, name FROM "Client" WHERE id = %s;', (user["clientId"],))
-                client = cur.fetchone()
-                if client:
-                    company_name = client.get("company") or client.get("name")
+                try:
+                    cur.execute('SELECT company, name, "software" FROM "Client" WHERE id = %s;', (user["clientId"],))
+                    client = cur.fetchone()
+                    if client:
+                        company_name = client.get("company") or client.get("name")
+                        software_name = client.get("software") or client.get("Software")
+                except Exception as e_col:
+                    # Fallback if "software" column isn't present in DB instance schema
+                    conn.rollback()
+                    cur.execute('SELECT company, name FROM "Client" WHERE id = %s;', (user["clientId"],))
+                    client = cur.fetchone()
+                    if client:
+                        company_name = client.get("company") or client.get("name")
         except Exception as e:
             print(f"Error fetching client info: {e}")
         finally:
@@ -553,9 +563,23 @@ async def read_index(request: Request):
             company_name = "Datalazo Partner"
 
     subdomain = get_client_subdomain(username)
+    software_config = APP_CONFIG.get("software", {})
     clients_config = APP_CONFIG.get("clients", {})
-    client_conf = clients_config.get(subdomain) or clients_config.get("vrt.datalazo.net", {})
-    
+
+    client_conf = None
+    if software_name and isinstance(software_name, str):
+        clean_software = software_name.strip()
+        client_conf = software_config.get(clean_software)
+        if not client_conf:
+            # Case-insensitive software key lookup
+            for key, val in software_config.items():
+                if key.lower() == clean_software.lower():
+                    client_conf = val
+                    break
+
+    if not client_conf:
+        client_conf = clients_config.get(subdomain) or software_config.get("Default") or clients_config.get("vrt.datalazo.net", {})
+
     if not client_conf or "csv_mapping" not in client_conf:
         client_conf = {"csv_mapping": DEFAULT_CSV_MAPPING}
         
@@ -565,7 +589,8 @@ async def read_index(request: Request):
         context={
             "client_config": client_conf,
             "username": username,
-            "company_name": company_name or "Datalazo Partner"
+            "company_name": company_name or "Datalazo Partner",
+            "software_name": software_name or ""
         }
     )
 
