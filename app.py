@@ -63,9 +63,59 @@ def get_current_username(request: Request) -> str | None:
     return valid_sessions.get(token) if token else None
 
 def require_auth(request: Request):
-    """Redirect to login if not authenticated."""
-    if not get_current_session(request):
+    """Redirect to login if not authenticated or not allowed on site."""
+    username = get_current_username(request)
+    if not username:
         raise HTTPException(status_code=303, headers={"Location": "/login"})
+    allowed, _ = is_user_allowed_on_site(username, request)
+    if not allowed:
+        raise HTTPException(status_code=303, headers={"Location": "/login"})
+
+# ── Site validation helpers ───────────────────────────────────────────────────
+def get_request_host(request: Request) -> str:
+    """Extract and normalize host domain from Request (handles X-Forwarded-Host and Host headers)."""
+    forwarded = request.headers.get("x-forwarded-host")
+    if forwarded:
+        host = forwarded.split(",")[0].strip()
+    else:
+        host = request.headers.get("host", "")
+    return host.split(":")[0].strip().lower()
+
+def is_user_allowed_on_site(username: str, request: Request) -> tuple[bool, str]:
+    """
+    Checks if the given user is allowed to log in or access the application on the current request host.
+    Returns (is_allowed: bool, assigned_subdomain: str).
+    """
+    request_host = get_request_host(request)
+
+    # Allow local development/testing host names
+    if request_host in ("localhost", "127.0.0.1", "testserver"):
+        return True, ""
+
+    # Allow default admin fallback user across domains
+    if username == APP_USERNAME or username.lower() == "admin@vrtservices12.com":
+        return True, ""
+
+    assigned = get_user_assigned_subdomain(username)
+    if not assigned:
+        return True, ""
+
+    assigned_subdomain = assigned.strip().lower()
+
+    # Exact match (e.g. ocr.datalazo.net == ocr.datalazo.net)
+    if request_host == assigned_subdomain:
+        return True, assigned_subdomain
+
+    # If assigned_subdomain is just the prefix (e.g. 'ocr')
+    if "." not in assigned_subdomain:
+        if request_host == assigned_subdomain or request_host.startswith(assigned_subdomain + "."):
+            return True, assigned_subdomain
+
+    # If request_host or assigned_subdomain are subdomains of each other
+    if request_host.endswith("." + assigned_subdomain) or assigned_subdomain.endswith("." + request_host):
+        return True, assigned_subdomain
+
+    return False, assigned_subdomain
 
 # ── Templates ──────────────────────────────────────────────────────────────────
 templates_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
@@ -141,14 +191,14 @@ def update_terms_accepted(username: str, ip: str, user_agent: str) -> bool:
         if conn:
             conn.close()
 
-def get_client_subdomain(username: str) -> str:
+def get_user_assigned_subdomain(username: str) -> str | None:
     user = get_client_user(username)
     if not user:
-        return "vrt.datalazo.net"
+        return None
     
     client_id = user.get("clientId")
     if not client_id:
-        return "vrt.datalazo.net"
+        return None
         
     conn = None
     try:
@@ -164,7 +214,11 @@ def get_client_subdomain(username: str) -> str:
         if conn:
             conn.close()
             
-    return "vrt.datalazo.net"
+    return None
+
+def get_client_subdomain(username: str) -> str:
+    subdomain = get_user_assigned_subdomain(username)
+    return subdomain if subdomain else "vrt.datalazo.net"
 
 def record_user_usage(username: str, page_count: int):
     conn = None
@@ -246,9 +300,16 @@ async def check_terms(username: str = ""):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = "", username: str = ""):
-    # Already logged in → go home
-    if get_current_session(request):
-        return RedirectResponse("/", status_code=302)
+    # Already logged in → check if allowed on current site
+    current_username = get_current_username(request)
+    if current_username:
+        allowed, _ = is_user_allowed_on_site(current_username, request)
+        if allowed:
+            return RedirectResponse("/", status_code=302)
+        else:
+            token = request.cookies.get(COOKIE_NAME)
+            if token:
+                valid_sessions.pop(token, None)
     
     terms_accepted = False
     if username:
@@ -275,6 +336,21 @@ async def login_submit(
     user = get_client_user(username_clean)
     if user:
         if verify_password(password, user["password"]):
+            # Validate site assignment permission
+            allowed, assigned_site = is_user_allowed_on_site(username_clean, request)
+            if not allowed:
+                request_host = get_request_host(request)
+                return templates.TemplateResponse(
+                    request=request,
+                    name="login.html",
+                    context={
+                        "error": f"Access denied: Your account is assigned to '{assigned_site}' and cannot log in on '{request_host}'.",
+                        "username": username_clean,
+                        "terms_accepted": bool(user.get("termsAccepted", False))
+                    },
+                    status_code=403
+                )
+
             # Check terms and conditions acceptance status
             if not user.get("termsAccepted", False):
                 if not terms:
@@ -300,7 +376,7 @@ async def login_submit(
             # Record login log
             client_ip = request.client.host if request.client else "unknown"
             user_agent = request.headers.get("user-agent", "")
-            site_host = request.headers.get("host", "")
+            site_host = get_request_host(request)
             record_login(username_clean, site_host, client_ip, user_agent)
             
             response = RedirectResponse("/", status_code=302)
@@ -315,13 +391,27 @@ async def login_submit(
             
     # 2. Fallback to default admin account
     if username_clean == APP_USERNAME and password == APP_PASSWORD:
+        allowed, assigned_site = is_user_allowed_on_site(username_clean, request)
+        if not allowed:
+            request_host = get_request_host(request)
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "error": f"Access denied: Your account is assigned to '{assigned_site}' and cannot log in on '{request_host}'.",
+                    "username": username_clean,
+                    "terms_accepted": True
+                },
+                status_code=403
+            )
+
         token = secrets.token_urlsafe(32)
         valid_sessions[token] = username_clean
         
         # Record login log
         client_ip = request.client.host if request.client else "unknown"
         user_agent = request.headers.get("user-agent", "")
-        site_host = request.headers.get("host", "")
+        site_host = get_request_host(request)
         record_login(username_clean, site_host, client_ip, user_agent)
         
         response = RedirectResponse("/", status_code=302)
@@ -366,6 +456,19 @@ async def read_index(request: Request):
     if not username:
         return RedirectResponse("/login", status_code=302)
         
+    allowed, assigned_site = is_user_allowed_on_site(username, request)
+    if not allowed:
+        token = request.cookies.get(COOKIE_NAME)
+        if token:
+            valid_sessions.pop(token, None)
+        request_host = get_request_host(request)
+        response = RedirectResponse(
+            f"/login?error=Access+denied:+Your+account+is+assigned+to+'{assigned_site}'.+You+cannot+access+'{request_host}'.",
+            status_code=302
+        )
+        response.delete_cookie(COOKIE_NAME)
+        return response
+
     company_name = None
     user = get_client_user(username)
     if user and user.get("clientId"):
@@ -412,8 +515,13 @@ async def process_pdf(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
 ):
-    if not get_current_session(request):
+    username = get_current_username(request)
+    if not username:
         raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    allowed, assigned_site = is_user_allowed_on_site(username, request)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=f"Access denied: Your account is assigned to '{assigned_site}'.")
 
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
@@ -457,8 +565,13 @@ async def support_submit(
     message: str = Form(...),
     file: UploadFile = File(None)
 ):
-    if not get_current_session(request):
+    username = get_current_username(request)
+    if not username:
         raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    allowed, assigned_site = is_user_allowed_on_site(username, request)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=f"Access denied: Your account is assigned to '{assigned_site}'.")
 
     resend_key = (
         os.environ.get("RESEND_API_KEY") or
