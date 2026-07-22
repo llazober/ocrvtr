@@ -417,7 +417,7 @@
     <div class="container">
         <header>
             <h1>Bank Statement Extractor</h1>
-            <p class="subtitle">Extract and reconcile transactions instantly in the cloud</p>
+            <p class="subtitle">Extract and reconcile transactions instantly</p>
         </header>
 
         <div class="card">
@@ -513,7 +513,6 @@
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button class="btn" id="downloadCsvBtn" style="padding: 8px 16px; font-size: 0.8rem; background: rgba(0, 230, 118, 0.08); border: 1px solid rgba(0, 230, 118, 0.2); color: var(--success-color); width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">Download CSV</button>
-                            <button class="btn" id="downloadJsonBtn" style="padding: 8px 16px; font-size: 0.8rem; background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.2); color: #00f2fe; width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">Download JSON</button>
                         </div>
                     </div>
                     <div style="overflow-y: auto; max-height: 450px; border: 1px solid var(--border-color); border-radius: 16px; background: rgba(0, 0, 0, 0.25); box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);">
@@ -860,7 +859,6 @@
 
         const backToUploadBtn = document.getElementById('backToUploadBtn');
         const downloadCsvBtn = document.getElementById('downloadCsvBtn');
-        const downloadJsonBtn = document.getElementById('downloadJsonBtn');
         let currentResult = null;
 
         function formatHeaderLabel(key) {
@@ -1024,16 +1022,16 @@
         }
 
         // Hover animations for download buttons
-        [downloadCsvBtn, downloadJsonBtn].forEach(btn => {
-            btn.addEventListener('mouseenter', () => {
-                btn.style.transform = 'translateY(-1px)';
-                btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+        if (downloadCsvBtn) {
+            downloadCsvBtn.addEventListener('mouseenter', () => {
+                downloadCsvBtn.style.transform = 'translateY(-1px)';
+                downloadCsvBtn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
             });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.transform = 'none';
-                btn.style.boxShadow = 'none';
+            downloadCsvBtn.addEventListener('mouseleave', () => {
+                downloadCsvBtn.style.transform = 'none';
+                downloadCsvBtn.style.boxShadow = 'none';
             });
-        });
+        }
 
         downloadCsvBtn.addEventListener('click', () => {
             if (!currentResult || !currentResult.transactions || currentResult.transactions.length === 0) return;
@@ -1112,45 +1110,6 @@
             } catch (err) {
                 console.error(err);
                 showAlert(`Error downloading CSV: ${err.message}`, 'error');
-            }
-        });
-
-        downloadJsonBtn.addEventListener('click', () => {
-            if (!currentResult) return;
-            
-            try {
-                const blob = new Blob([JSON.stringify(currentResult, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                
-                let baseName = 'statement';
-                if (currentResult.business_name) {
-                    baseName = currentResult.business_name;
-                    if (currentResult.period) {
-                        baseName += '_' + currentResult.period;
-                    }
-                } else if (currentResult.period) {
-                    baseName = currentResult.period;
-                }
-                
-                let sanitized = baseName.replace(/[\\/:]/g, '-');
-                sanitized = sanitized.replace(/[*?"<>|]/g, '');
-                sanitized = sanitized.replace(/\s+/g, ' ').replace(/-+/g, '-').trim();
-                const filename = sanitized + '.json';
-                
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = filename;
-                link.setAttribute("download", filename);
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-            } catch (err) {
-                console.error(err);
-                showAlert(`Error downloading JSON: ${err.message}`, 'error');
             }
         });
 
