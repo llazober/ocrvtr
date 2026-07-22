@@ -330,6 +330,200 @@ def record_login(username: str, site: str, ip: str, user_agent: str):
         if conn:
             conn.close()
 
+# ── QuickBooks Online (QBO) OAuth & API Integration ───────────────────────────
+QBO_CLIENT_ID     = os.environ.get("QBO_CLIENT_ID", "")
+QBO_CLIENT_SECRET = os.environ.get("QBO_CLIENT_SECRET", "")
+QBO_REDIRECT_URI  = os.environ.get("QBO_REDIRECT_URI", "https://vrt.datalazo.net/auth/qbo/callback")
+QBO_ENVIRONMENT   = os.environ.get("QBO_ENVIRONMENT", "sandbox").lower()
+
+QBO_AUTH_URL      = "https://appcenter.intuit.com/connect/oauth2"
+QBO_TOKEN_URL     = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
+
+def get_qbo_api_base_url(realm_id: str) -> str:
+    if QBO_ENVIRONMENT == "production":
+        return f"https://quickbooks.api.intuit.com/v3/company/{realm_id}"
+    else:
+        return f"https://sandbox-quickbooks.api.intuit.com/v3/company/{realm_id}"
+
+def init_qbo_db():
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS "QboConnection" (
+                    "id" SERIAL PRIMARY KEY,
+                    "clientId" TEXT UNIQUE NOT NULL,
+                    "realmId" TEXT NOT NULL,
+                    "accessToken" TEXT NOT NULL,
+                    "refreshToken" TEXT NOT NULL,
+                    "accessTokenExpiresAt" TIMESTAMP WITH TIME ZONE,
+                    "refreshTokenExpiresAt" TIMESTAMP WITH TIME ZONE,
+                    "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            ''')
+            conn.commit()
+    except Exception as e:
+        print(f"Error initializing QboConnection table: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+init_qbo_db()
+
+def save_qbo_connection(client_id_key: str, realm_id: str, access_token: str, refresh_token: str, expires_in: int, refresh_expires_in: int = 8726400):
+    conn = None
+    try:
+        conn = get_db_connection()
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        access_expires_at = now + datetime.timedelta(seconds=expires_in)
+        refresh_expires_at = now + datetime.timedelta(seconds=refresh_expires_in)
+        
+        with conn.cursor() as cur:
+            cur.execute('''
+                INSERT INTO "QboConnection" ("clientId", "realmId", "accessToken", "refreshToken", "accessTokenExpiresAt", "refreshTokenExpiresAt", "updatedAt")
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT ("clientId") DO UPDATE SET
+                    "realmId" = EXCLUDED."realmId",
+                    "accessToken" = EXCLUDED."accessToken",
+                    "refreshToken" = EXCLUDED."refreshToken",
+                    "accessTokenExpiresAt" = EXCLUDED."accessTokenExpiresAt",
+                    "refreshTokenExpiresAt" = EXCLUDED."refreshTokenExpiresAt",
+                    "updatedAt" = EXCLUDED."updatedAt";
+            ''', (client_id_key, realm_id, access_token, refresh_token, access_expires_at, refresh_expires_at, now))
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Error saving QboConnection: {e}")
+        return False
+    finally:
+        if conn:
+            conn.close()
+
+def get_qbo_connection(client_id_key: str) -> dict | None:
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('SELECT * FROM "QboConnection" WHERE "clientId" = %s;', (client_id_key,))
+            return cur.fetchone()
+    except Exception as e:
+        print(f"Error fetching QboConnection: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+def refresh_qbo_tokens(refresh_token: str) -> dict | None:
+    if not QBO_CLIENT_ID or not QBO_CLIENT_SECRET:
+        return None
+
+    import urllib.parse
+    auth_header = base64.b64encode(f"{QBO_CLIENT_ID}:{QBO_CLIENT_SECRET}".encode()).decode()
+    headers = {
+        "Authorization": f"Basic {auth_header}",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json"
+    }
+    body = urllib.parse.urlencode({
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token
+    }).encode("utf-8")
+
+    req = urllib.request.Request(QBO_TOKEN_URL, data=body, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data
+    except Exception as e:
+        print(f"Error refreshing QBO token: {e}")
+        return None
+
+def get_valid_qbo_access_token(client_id_key: str) -> tuple[str | None, str | None]:
+    qbo_conn = get_qbo_connection(client_id_key)
+    if not qbo_conn:
+        return None, None
+
+    import datetime
+    now = datetime.datetime.now(datetime.timezone.utc)
+    access_expires_at = qbo_conn.get("accessTokenExpiresAt")
+    
+    if access_expires_at:
+        if access_expires_at.tzinfo is None:
+            now_compare = now.replace(tzinfo=None)
+        else:
+            now_compare = now
+            
+        if access_expires_at <= (now_compare + datetime.timedelta(minutes=5)):
+            res = refresh_qbo_tokens(qbo_conn["refreshToken"])
+            if res and "access_token" in res:
+                new_access_token = res["access_token"]
+                new_refresh_token = res.get("refresh_token", qbo_conn["refreshToken"])
+                expires_in = res.get("expires_in", 3600)
+                refresh_expires_in = res.get("x_refresh_token_expires_in", 8726400)
+                save_qbo_connection(client_id_key, qbo_conn["realmId"], new_access_token, new_refresh_token, expires_in, refresh_expires_in)
+                return new_access_token, qbo_conn["realmId"]
+            else:
+                return None, None
+
+    return qbo_conn["accessToken"], qbo_conn["realmId"]
+
+def fetch_qbo_chart_of_accounts(access_token: str, realm_id: str) -> list[dict]:
+    import urllib.parse
+    base_url = get_qbo_api_base_url(realm_id)
+    query = "SELECT * FROM Account MAXRESULTS 1000"
+    url = f"{base_url}/query?query={urllib.parse.quote(query)}&minorversion=65"
+    
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json"
+    })
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            query_response = data.get("QueryResponse", {})
+            return query_response.get("Account", [])
+    except Exception as e:
+        print(f"Error fetching QBO Chart of Accounts: {e}")
+        return []
+
+def resolve_qbo_account_ids(access_token: str, realm_id: str, debit_num="260", credit_num="500") -> tuple[dict | None, dict | None]:
+    accounts = fetch_qbo_chart_of_accounts(access_token, realm_id)
+    
+    debit_acc = None
+    credit_acc = None
+    
+    for acc in accounts:
+        acct_num = str(acc.get("AcctNum", "")).strip()
+        name = str(acc.get("Name", "")).strip()
+        
+        if not debit_acc and (acct_num == str(debit_num) or name == str(debit_num)):
+            debit_acc = acc
+        if not credit_acc and (acct_num == str(credit_num) or name == str(credit_num)):
+            credit_acc = acc
+            
+    if not debit_acc:
+        for acc in accounts:
+            if acc.get("AccountType") in ("Bank", "Other Current Asset"):
+                debit_acc = acc
+                break
+    if not credit_acc:
+        for acc in accounts:
+            if acc.get("AccountType") in ("Expense", "Cost of Goods Sold", "Other Expense"):
+                credit_acc = acc
+                break
+
+    if not debit_acc and accounts:
+        debit_acc = accounts[0]
+    if not credit_acc and len(accounts) > 1:
+        credit_acc = accounts[1]
+    elif not credit_acc and accounts:
+        credit_acc = accounts[0]
+
+    return debit_acc, credit_acc
+
+
 # ── Auth routes ────────────────────────────────────────────────────────────────
 @app.get("/api/check-terms")
 async def check_terms(username: str = ""):
@@ -511,7 +705,7 @@ async def logout(request: Request, reason: str = ""):
 
 # ── Protected routes ───────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
-async def read_index(request: Request):
+async def read_index(request: Request, msg: str = "", error: str = ""):
     username = get_current_username(request)
     if not username:
         return RedirectResponse("/login", status_code=302)
@@ -532,6 +726,8 @@ async def read_index(request: Request):
     company_name = None
     software_name = None
     user = get_client_user(username)
+    client_id_key = str(user.get("clientId")) if (user and user.get("clientId")) else username
+
     if user and user.get("clientId"):
         conn = None
         try:
@@ -544,7 +740,6 @@ async def read_index(request: Request):
                         company_name = client.get("company") or client.get("name")
                         software_name = client.get("software") or client.get("Software")
                 except Exception as e_col:
-                    # Fallback if "software" column isn't present in DB instance schema
                     conn.rollback()
                     cur.execute('SELECT company, name FROM "Client" WHERE id = %s;', (user["clientId"],))
                     client = cur.fetchone()
@@ -571,7 +766,6 @@ async def read_index(request: Request):
         clean_software = software_name.strip()
         client_conf = software_config.get(clean_software)
         if not client_conf:
-            # Case-insensitive software key lookup
             for key, val in software_config.items():
                 if key.lower() == clean_software.lower():
                     client_conf = val
@@ -582,7 +776,11 @@ async def read_index(request: Request):
 
     if not client_conf or "csv_mapping" not in client_conf:
         client_conf = {"csv_mapping": DEFAULT_CSV_MAPPING}
-        
+
+    # Check QBO connection status
+    qbo_token, qbo_realm_id = get_valid_qbo_access_token(client_id_key)
+    qbo_connected = bool(qbo_token and qbo_realm_id)
+
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -590,9 +788,218 @@ async def read_index(request: Request):
             "client_config": client_conf,
             "username": username,
             "company_name": company_name or "Datalazo Partner",
-            "software_name": software_name or ""
+            "software_name": software_name or "",
+            "qbo_connected": qbo_connected,
+            "qbo_realm_id": qbo_realm_id or "",
+            "msg": msg,
+            "error": error
         }
     )
+
+# ── QBO OAuth & Export API Routes ──────────────────────────────────────────────
+@app.get("/auth/qbo/login")
+async def qbo_login(request: Request):
+    username = get_current_username(request)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    if not QBO_CLIENT_ID or not QBO_CLIENT_SECRET:
+        return RedirectResponse("/?error=QuickBooks+API+credentials+not+configured+on+server", status_code=302)
+
+    user = get_client_user(username)
+    client_id_key = str(user.get("clientId")) if (user and user.get("clientId")) else username
+
+    import urllib.parse
+    state_token = secrets.token_urlsafe(16)
+    state_val = f"{client_id_key}:{state_token}"
+    params = {
+        "client_id": QBO_CLIENT_ID,
+        "response_type": "code",
+        "scope": "com.intuit.quickbooks.accounting",
+        "redirect_uri": QBO_REDIRECT_URI,
+        "state": state_val
+    }
+    auth_redirect = f"{QBO_AUTH_URL}?{urllib.parse.urlencode(params)}"
+    return RedirectResponse(auth_redirect, status_code=302)
+
+@app.get("/auth/qbo/callback")
+async def qbo_callback(request: Request, code: str = "", state: str = "", realmId: str = "", error: str = ""):
+    if error:
+        return RedirectResponse(f"/?error=QuickBooks+Auth+Error:+{error}", status_code=302)
+
+    if not code or not realmId:
+        return RedirectResponse("/?error=QuickBooks+connection+failed:+Missing+code+or+realmId", status_code=302)
+
+    client_id_key = state.split(":")[0] if ":" in state else state
+
+    import urllib.parse
+    auth_header = base64.b64encode(f"{QBO_CLIENT_ID}:{QBO_CLIENT_SECRET}".encode()).decode()
+    headers = {
+        "Authorization": f"Basic {auth_header}",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json"
+    }
+    body = urllib.parse.urlencode({
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": QBO_REDIRECT_URI
+    }).encode("utf-8")
+
+    req = urllib.request.Request(QBO_TOKEN_URL, data=body, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            token_data = json.loads(resp.read().decode("utf-8"))
+            access_token = token_data.get("access_token")
+            refresh_token = token_data.get("refresh_token")
+            expires_in = token_data.get("expires_in", 3600)
+            refresh_expires_in = token_data.get("x_refresh_token_expires_in", 8726400)
+
+            if access_token and refresh_token:
+                save_qbo_connection(client_id_key, realmId, access_token, refresh_token, expires_in, refresh_expires_in)
+                return RedirectResponse("/?msg=QuickBooks+Online+Connected+Successfully!", status_code=302)
+    except Exception as e:
+        print(f"Error exchanging QBO authorization code: {e}")
+
+    return RedirectResponse("/?error=Failed+to+exchange+QuickBooks+token", status_code=302)
+
+@app.get("/api/qbo/status")
+async def qbo_status(request: Request):
+    username = get_current_username(request)
+    if not username:
+        return {"connected": False}
+    user = get_client_user(username)
+    client_id_key = str(user.get("clientId")) if (user and user.get("clientId")) else username
+    access_token, realm_id = get_valid_qbo_access_token(client_id_key)
+    return {"connected": bool(access_token and realm_id), "realm_id": realm_id or ""}
+
+@app.post("/api/qbo/export")
+async def export_to_qbo(request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    user = get_client_user(username)
+    client_id_key = str(user.get("clientId")) if (user and user.get("clientId")) else username
+
+    access_token, realm_id = get_valid_qbo_access_token(client_id_key)
+    if not access_token or not realm_id:
+        raise HTTPException(status_code=400, detail="QuickBooks is not connected. Please connect QuickBooks first.")
+
+    payload = await request.json()
+    transactions = payload.get("transactions", [])
+    if not transactions:
+        raise HTTPException(status_code=400, detail="No transactions provided to sync.")
+
+    # Dynamically resolve Chart of Accounts for 260 and 500
+    debit_acc, credit_acc = resolve_qbo_account_ids(access_token, realm_id, "260", "500")
+    if not debit_acc or not credit_acc:
+        raise HTTPException(status_code=400, detail="Could not resolve Chart of Accounts in QuickBooks Online.")
+
+    lines = []
+    for tx in transactions:
+        dep = tx.get("Deposits")
+        withd = tx.get("Withdrawals")
+        desc = tx.get("description", "Bank Statement Transaction")
+        if not desc:
+            desc = "Bank Statement Transaction"
+        desc = str(desc)[:100]
+
+        has_debit = dep is not None and dep != ""
+        has_credit = withd is not None and withd != ""
+
+        if has_debit:
+            amt = float(dep)
+            lines.append({
+                "Description": desc,
+                "Amount": amt,
+                "DetailType": "JournalEntryLineDetail",
+                "JournalEntryLineDetail": {
+                    "PostingType": "Debit",
+                    "AccountRef": {
+                        "value": str(debit_acc["Id"]),
+                        "name": str(debit_acc.get("Name", "Debit Account"))
+                    }
+                }
+            })
+            lines.append({
+                "Description": desc,
+                "Amount": amt,
+                "DetailType": "JournalEntryLineDetail",
+                "JournalEntryLineDetail": {
+                    "PostingType": "Credit",
+                    "AccountRef": {
+                        "value": str(credit_acc["Id"]),
+                        "name": str(credit_acc.get("Name", "Credit Account"))
+                    }
+                }
+            })
+        elif has_credit:
+            amt = float(withd)
+            lines.append({
+                "Description": desc,
+                "Amount": amt,
+                "DetailType": "JournalEntryLineDetail",
+                "JournalEntryLineDetail": {
+                    "PostingType": "Credit",
+                    "AccountRef": {
+                        "value": str(debit_acc["Id"]),
+                        "name": str(debit_acc.get("Name", "Debit Account"))
+                    }
+                }
+            })
+            lines.append({
+                "Description": desc,
+                "Amount": amt,
+                "DetailType": "JournalEntryLineDetail",
+                "JournalEntryLineDetail": {
+                    "PostingType": "Debit",
+                    "AccountRef": {
+                        "value": str(credit_acc["Id"]),
+                        "name": str(credit_acc.get("Name", "Credit Account"))
+                    }
+                }
+            })
+
+    if not lines:
+        raise HTTPException(status_code=400, detail="No valid transactions with deposit/withdrawal amounts found.")
+
+    qbo_payload = {
+        "Line": lines
+    }
+
+    base_url = get_qbo_api_base_url(realm_id)
+    post_url = f"{base_url}/journalentry?minorversion=65"
+
+    req = urllib.request.Request(
+        post_url,
+        data=json.dumps(qbo_payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8"))
+            je = resp_data.get("JournalEntry", {})
+            je_id = je.get("Id", "Created")
+            return {
+                "success": True,
+                "journal_entry_id": je_id,
+                "message": f"Successfully created Journal Entry #{je_id} in QuickBooks Online!",
+                "debit_account": debit_acc.get("Name"),
+                "credit_account": credit_acc.get("Name")
+            }
+    except urllib.error.HTTPError as he:
+        err_body = he.read().decode("utf-8")
+        print(f"QBO API Error: {err_body}")
+        raise HTTPException(status_code=400, detail=f"QuickBooks API Error: {err_body}")
+    except Exception as e:
+        print(f"Error posting to QBO: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to post to QuickBooks Online: {e}")
 
 @app.post("/process")
 async def process_pdf(

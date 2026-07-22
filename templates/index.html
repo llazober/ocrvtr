@@ -511,7 +511,21 @@
                             <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main);">Transactions</h3>
                             <span id="txCountBadge" style="background: rgba(225, 0, 255, 0.1); color: #e100ff; border: 1px solid rgba(225, 0, 255, 0.2); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600;">0 records</span>
                         </div>
-                        <div style="display: flex; gap: 8px;">
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            {% if software_name and software_name.lower() == 'qbo' %}
+                                {% if qbo_connected %}
+                                    <span style="background: rgba(0, 230, 118, 0.1); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.2); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600;" title="Realm ID: {{ qbo_realm_id }}">
+                                        ✓ Connected to QBO
+                                    </span>
+                                    <button class="btn" id="syncQboBtn" style="padding: 8px 16px; font-size: 0.8rem; background: linear-gradient(135deg, #2ca01c 0%, #108000 100%); border: none; color: #ffffff; width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; border-radius: 8px; box-shadow: 0 4px 12px rgba(44, 160, 28, 0.3);">
+                                        Sync to QuickBooks
+                                    </button>
+                                {% else %}
+                                    <a href="/auth/qbo/login" class="btn" style="padding: 8px 16px; font-size: 0.8rem; background: linear-gradient(135deg, #2ca01c 0%, #108000 100%); border: none; color: #ffffff; width: auto; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; box-shadow: 0 4px 12px rgba(44, 160, 28, 0.3);">
+                                        Connect to QuickBooks
+                                    </a>
+                                {% endif %}
+                            {% endif %}
                             <button class="btn" id="downloadCsvBtn" style="padding: 8px 16px; font-size: 0.8rem; background: rgba(0, 230, 118, 0.08); border: 1px solid rgba(0, 230, 118, 0.2); color: var(--success-color); width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">Download CSV</button>
                         </div>
                     </div>
@@ -739,6 +753,12 @@
 
     <script>
         window.CLIENT_CONFIG = {{ client_config | tojson | safe }};
+        window.SOFTWARE_NAME = {{ software_name | tojson | safe }};
+        window.QBO_CONNECTED = {{ qbo_connected | tojson | safe }};
+        window.QBO_REALM_ID = {{ qbo_realm_id | tojson | safe }};
+        window.SERVER_MSG = {{ msg | tojson | safe }};
+        window.SERVER_ERROR = {{ error | tojson | safe }};
+
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const fileInfoBox = document.getElementById('fileInfoBox');
@@ -1112,6 +1132,50 @@
                 showAlert(`Error downloading CSV: ${err.message}`, 'error');
             }
         });
+
+        // QuickBooks Online Sync Button Listener
+        const syncQboBtn = document.getElementById('syncQboBtn');
+        if (syncQboBtn) {
+            syncQboBtn.addEventListener('click', async () => {
+                if (!currentResult || !currentResult.transactions || currentResult.transactions.length === 0) {
+                    showAlert('No extracted transactions available to sync.', 'error');
+                    return;
+                }
+
+                syncQboBtn.disabled = true;
+                syncQboBtn.textContent = 'Syncing to QuickBooks...';
+                syncQboBtn.style.opacity = '0.7';
+
+                try {
+                    const response = await fetch('/api/qbo/export', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ transactions: currentResult.transactions })
+                    });
+                    const resData = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(resData.detail || 'Failed to sync to QuickBooks Online.');
+                    }
+
+                    showAlert(resData.message || 'Successfully posted Journal Entry to QuickBooks Online!', 'success');
+                } catch (err) {
+                    console.error(err);
+                    showAlert(err.message || 'Error syncing to QuickBooks.', 'error');
+                } finally {
+                    syncQboBtn.disabled = false;
+                    syncQboBtn.textContent = 'Sync to QuickBooks';
+                    syncQboBtn.style.opacity = '1';
+                }
+            });
+        }
+
+        // Show URL messages/errors on load
+        if (window.SERVER_MSG) {
+            showAlert(window.SERVER_MSG, 'success');
+        } else if (window.SERVER_ERROR) {
+            showAlert(window.SERVER_ERROR, 'error');
+        }
 
         backToUploadBtn.addEventListener('click', () => {
             // Reset selected file and state
