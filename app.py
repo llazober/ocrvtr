@@ -1,4 +1,5 @@
 import os
+import time
 import secrets
 import shutil
 import tempfile
@@ -23,44 +24,58 @@ app = FastAPI(title="Bank Statement OCR Extractor")
 APP_USERNAME = os.environ.get("APP_USERNAME", "admin@vrtservices12.com")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "hon12345")
 COOKIE_NAME  = "ocr_session"
+# Session tracking:
+# valid_sessions: token -> {"username": str}
+# active_user_tokens: username -> token (Enforces single active instance per user)
+valid_sessions: dict[str, dict] = {}
+active_user_tokens: dict[str, str] = {}
 
-# In-memory dict of valid sessions mapping token -> username (cleared on restart)
-valid_sessions: dict[str, str] = {}
+def create_user_session(username: str) -> str:
+    """Creates a new session token, invalidating any previous session for the username."""
+    username_clean = username.strip()
+    old_token = active_user_tokens.get(username_clean)
+    if old_token:
+        valid_sessions.pop(old_token, None)
 
-# ── Dynamic CSV Export Layout Config ───────────────────────────────────────────
-DEFAULT_CSV_MAPPING = {
-    "headers": ["Type", "Date", "Entity Code", "Account", "Debit", "Credit", "Description", "Reference"],
-    "fields": [
-        {"header": "Type", "type": "constant", "value": "GJ"},
-        {"header": "Date", "type": "field", "source": "date"},
-        {"header": "Entity Code", "type": "constant", "value": ""},
-        {"header": "Account", "type": "account_mapping", "debit_value": "260", "credit_value": "500"},
-        {"header": "Debit", "type": "debit"},
-        {"header": "Credit", "type": "credit"},
-        {"header": "Description", "type": "field", "source": "description", "max_length": 98},
-        {"header": "Reference", "type": "reference"}
-    ]
-}
+    token = secrets.token_urlsafe(32)
+    valid_sessions[token] = {
+        "username": username_clean
+    }
+    active_user_tokens[username_clean] = token
+    return token
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datalazo.config.json")
-def load_config() -> dict:
-    if os.path.exists(CONFIG_PATH):
-        try:
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error loading config: {e}")
-    return {}
+def get_current_session_info(request: Request) -> tuple[str | None, str | None, str | None]:
+    """
+    Validates cookie token. Checks:
+    1. Token existence in valid_sessions
+    2. Single active instance rule (active_user_tokens[username] == token)
 
-APP_CONFIG = load_config()
+    Returns (token, username, invalid_reason).
+    """
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        return None, None, None
+
+    sess = valid_sessions.get(token)
+    if not sess:
+        return None, None, "Your account was logged in from another device or location."
+
+    username = sess.get("username")
+
+    # Single active instance check: Ensure token is still the active token for this username
+    if active_user_tokens.get(username) != token:
+        valid_sessions.pop(token, None)
+        return None, None, "Your account was logged in from another device or location."
+
+    return token, username, None
 
 def get_current_session(request: Request) -> str | None:
-    token = request.cookies.get(COOKIE_NAME)
-    return token if token in valid_sessions else None
+    token, _, _ = get_current_session_info(request)
+    return token
 
 def get_current_username(request: Request) -> str | None:
-    token = request.cookies.get(COOKIE_NAME)
-    return valid_sessions.get(token) if token else None
+    _, username, _ = get_current_session_info(request)
+    return username
 
 def require_auth(request: Request):
     """Redirect to login if not authenticated or not allowed on site."""
@@ -298,6 +313,16 @@ async def check_terms(username: str = ""):
         return {"termsAccepted": bool(user.get("termsAccepted", False))}
     return {"termsAccepted": False}
 
+@app.get("/api/session-status")
+async def check_session_status(request: Request):
+    token, username, reason = get_current_session_info(request)
+    if not username:
+        return {"valid": False, "reason": reason or "Session invalid."}
+    allowed, assigned_site = is_user_allowed_on_site(username, request)
+    if not allowed:
+        return {"valid": False, "reason": f"Access denied: Your account is assigned to '{assigned_site}'."}
+    return {"valid": True, "username": username}
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = "", username: str = ""):
     # Already logged in → check if allowed on current site
@@ -369,9 +394,8 @@ async def login_submit(
                     user_agent = request.headers.get("user-agent", "")
                     update_terms_accepted(username_clean, client_ip, user_agent)
             
-            # Create session and redirect
-            token = secrets.token_urlsafe(32)
-            valid_sessions[token] = username_clean
+            # Create single active session and redirect
+            token = create_user_session(username_clean)
             
             # Record login log
             client_ip = request.client.host if request.client else "unknown"
@@ -405,8 +429,7 @@ async def login_submit(
                 status_code=403
             )
 
-        token = secrets.token_urlsafe(32)
-        valid_sessions[token] = username_clean
+        token = create_user_session(username_clean)
         
         # Record login log
         client_ip = request.client.host if request.client else "unknown"
@@ -441,11 +464,20 @@ async def login_submit(
     )
 
 @app.get("/logout")
-async def logout(request: Request):
+async def logout(request: Request, reason: str = ""):
     token = request.cookies.get(COOKIE_NAME)
     if token:
-        valid_sessions.pop(token, None)
-    response = RedirectResponse("/login", status_code=302)
+        sess = valid_sessions.pop(token, None)
+        if sess and isinstance(sess, dict) and "username" in sess:
+            username = sess["username"]
+            if active_user_tokens.get(username) == token:
+                active_user_tokens.pop(username, None)
+                
+    redirect_url = "/login"
+    if reason == "concurrent":
+        redirect_url += "?error=Logged+out:+Your+account+was+accessed+from+another+device+or+location."
+
+    response = RedirectResponse(redirect_url, status_code=302)
     response.delete_cookie(COOKIE_NAME)
     return response
 

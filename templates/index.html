@@ -1355,6 +1355,24 @@
             }
         });
 
+        // --- Concurrent Single-Active-Session Protection ---
+        (function initSessionProtection() {
+            // Periodic background health check (every 15 seconds) to detect if logged in from another device
+            setInterval(async () => {
+                try {
+                    const res = await fetch('/api/session-status');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (!data.valid) {
+                            window.location.href = '/logout?reason=concurrent';
+                        }
+                    }
+                } catch (e) {
+                    console.error('Session ping error:', e);
+                }
+            }, 15000);
+        })();
+
         // --- Auto-Test Automation Mode ---
         if (window.location.search.includes('test=true')) {
             console.log("Auto-test mode detected.");
