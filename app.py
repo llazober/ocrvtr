@@ -70,6 +70,23 @@ def create_user_session(username: str) -> str:
         "username": username_clean
     }
     active_user_tokens[username_clean] = token
+
+    # Persist session token in database so server redeployments/restarts keep users logged in
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                'UPDATE "ClientUser" SET "sessionToken" = %s WHERE username = %s;',
+                (token, username_clean)
+            )
+            conn.commit()
+    except Exception as e:
+        print(f"Database error updating sessionToken: {e}")
+    finally:
+        if conn:
+            conn.close()
+
     return token
 
 def get_current_session_info(request: Request) -> tuple[str | None, str | None, str | None]:
@@ -77,6 +94,7 @@ def get_current_session_info(request: Request) -> tuple[str | None, str | None, 
     Validates cookie token. Checks:
     1. Token existence in valid_sessions
     2. Single active instance rule (active_user_tokens[username] == token)
+    3. Database fallback lookup across server restarts
 
     Returns (token, username, invalid_reason).
     """
@@ -85,17 +103,30 @@ def get_current_session_info(request: Request) -> tuple[str | None, str | None, 
         return None, None, None
 
     sess = valid_sessions.get(token)
-    if not sess:
-        return None, None, "Your account was logged in from another device or location."
+    if sess:
+        username = sess.get("username")
+        if active_user_tokens.get(username) == token:
+            return token, username, None
 
-    username = sess.get("username")
+    # Fallback lookup in DB if server was restarted and in-memory dicts were reset
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('SELECT username FROM "ClientUser" WHERE "sessionToken" = %s;', (token,))
+            user = cur.fetchone()
+            if user and user.get("username"):
+                username_clean = user.get("username")
+                valid_sessions[token] = {"username": username_clean}
+                active_user_tokens[username_clean] = token
+                return token, username_clean, None
+    except Exception as e:
+        pass
+    finally:
+        if conn:
+            conn.close()
 
-    # Single active instance check: Ensure token is still the active token for this username
-    if active_user_tokens.get(username) != token:
-        valid_sessions.pop(token, None)
-        return None, None, "Your account was logged in from another device or location."
-
-    return token, username, None
+    return None, None, "Your account was logged in from another device or location."
 
 def get_current_session(request: Request) -> str | None:
     token, _, _ = get_current_session_info(request)
@@ -362,6 +393,10 @@ def init_qbo_db():
                     "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
             ''')
+            try:
+                cur.execute('ALTER TABLE "ClientUser" ADD COLUMN IF NOT EXISTS "sessionToken" TEXT;')
+            except Exception as e_col:
+                print(f"sessionToken column check: {e_col}")
             conn.commit()
     except Exception as e:
         print(f"Error initializing QboConnection table: {e}")
@@ -808,10 +843,11 @@ async def qbo_login(request: Request):
 
     user = get_client_user(username)
     client_id_key = str(user.get("clientId")) if (user and user.get("clientId")) else username
+    origin_host = get_request_host(request)
 
     import urllib.parse
     state_token = secrets.token_urlsafe(16)
-    state_val = f"{client_id_key}:{state_token}"
+    state_val = f"{origin_host}|{client_id_key}|{state_token}"
     params = {
         "client_id": QBO_CLIENT_ID,
         "response_type": "code",
@@ -824,13 +860,18 @@ async def qbo_login(request: Request):
 
 @app.get("/auth/qbo/callback")
 async def qbo_callback(request: Request, code: str = "", state: str = "", realmId: str = "", error: str = ""):
+    parts = state.split("|") if "|" in state else [state]
+    origin_host = parts[0] if len(parts) >= 2 else ""
+    client_id_key = parts[1] if len(parts) >= 2 else parts[0]
+
+    scheme = "http" if origin_host in ("localhost", "127.0.0.1", "testserver") else "https"
+    redirect_prefix = f"{scheme}://{origin_host}" if origin_host else ""
+
     if error:
-        return RedirectResponse(f"/?error=QuickBooks+Auth+Error:+{error}", status_code=302)
+        return RedirectResponse(f"{redirect_prefix}/?error=QuickBooks+Auth+Error:+{error}", status_code=302)
 
     if not code or not realmId:
-        return RedirectResponse("/?error=QuickBooks+connection+failed:+Missing+code+or+realmId", status_code=302)
-
-    client_id_key = state.split(":")[0] if ":" in state else state
+        return RedirectResponse(f"{redirect_prefix}/?error=QuickBooks+connection+failed:+Missing+code+or+realmId", status_code=302)
 
     import urllib.parse
     auth_header = base64.b64encode(f"{QBO_CLIENT_ID}:{QBO_CLIENT_SECRET}".encode()).decode()
@@ -856,11 +897,11 @@ async def qbo_callback(request: Request, code: str = "", state: str = "", realmI
 
             if access_token and refresh_token:
                 save_qbo_connection(client_id_key, realmId, access_token, refresh_token, expires_in, refresh_expires_in)
-                return RedirectResponse("/?msg=QuickBooks+Online+Connected+Successfully!", status_code=302)
+                return RedirectResponse(f"{redirect_prefix}/?msg=QuickBooks+Online+Connected+Successfully!", status_code=302)
     except Exception as e:
         print(f"Error exchanging QBO authorization code: {e}")
 
-    return RedirectResponse("/?error=Failed+to+exchange+QuickBooks+token", status_code=302)
+    return RedirectResponse(f"{redirect_prefix}/?error=Failed+to+exchange+QuickBooks+token", status_code=302)
 
 @app.get("/api/qbo/status")
 async def qbo_status(request: Request):
