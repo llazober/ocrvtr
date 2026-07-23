@@ -1039,6 +1039,19 @@
                 tableBody.appendChild(tr);
             });
 
+            // Reset QBO sync button for new statement results
+            const syncBtn = document.getElementById('syncQboBtn');
+            if (syncBtn) {
+                syncBtn.disabled = false;
+                syncBtn.dataset.synced = 'false';
+                syncBtn.textContent = 'Sync to QuickBooks';
+                syncBtn.style.opacity = '1';
+                syncBtn.style.background = 'linear-gradient(135deg, #2ca01c 0%, #108000 100%)';
+                syncBtn.style.color = '#ffffff';
+                syncBtn.style.cursor = 'pointer';
+                syncBtn.style.boxShadow = '0 4px 12px rgba(44, 160, 28, 0.3)';
+            }
+
             // Transition UI
             loadingState.style.display = 'none';
             document.getElementById('resultsContainer').style.display = 'block';
@@ -1146,10 +1159,16 @@
                     return;
                 }
 
+                if (syncQboBtn.dataset.synced === 'true') {
+                    showAlert('This statement has already been synced to QuickBooks.', 'error');
+                    return;
+                }
+
                 syncQboBtn.disabled = true;
                 syncQboBtn.textContent = 'Syncing to QuickBooks...';
                 syncQboBtn.style.opacity = '0.7';
 
+                let syncSuccess = false;
                 try {
                     const isBatch = document.getElementById('qboBatchCheckbox') ? document.getElementById('qboBatchCheckbox').checked : true;
                     const response = await fetch('/api/qbo/export', {
@@ -1166,14 +1185,26 @@
                         throw new Error(resData.detail || 'Failed to sync to QuickBooks Online.');
                     }
 
+                    syncSuccess = true;
                     showAlert(resData.message || 'Successfully posted Journal Entry to QuickBooks Online!', 'success');
                 } catch (err) {
                     console.error(err);
                     showAlert(err.message || 'Error syncing to QuickBooks.', 'error');
                 } finally {
-                    syncQboBtn.disabled = false;
-                    syncQboBtn.textContent = 'Sync to QuickBooks';
-                    syncQboBtn.style.opacity = '1';
+                    if (syncSuccess) {
+                        syncQboBtn.disabled = true;
+                        syncQboBtn.dataset.synced = 'true';
+                        syncQboBtn.textContent = '✓ Synced to QuickBooks';
+                        syncQboBtn.style.opacity = '0.5';
+                        syncQboBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                        syncQboBtn.style.color = 'var(--text-muted)';
+                        syncQboBtn.style.cursor = 'not-allowed';
+                        syncQboBtn.style.boxShadow = 'none';
+                    } else {
+                        syncQboBtn.disabled = false;
+                        syncQboBtn.textContent = 'Sync to QuickBooks';
+                        syncQboBtn.style.opacity = '1';
+                    }
                 }
             });
         }
