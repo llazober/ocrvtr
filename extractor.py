@@ -1067,20 +1067,35 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
             else:
                 seg_lines = group_words_into_lines(seg_words, y_tol=8)
                 current_tx = None
+                last_date = None
                 for y, text in seg_lines:
                     if any(h in text for h in ['Date Description Amount', 'Subtotal for card', 'Total withdrawals', 'Average ledger']):
                         continue
                     if text.strip().startswith('Card account #'):
                         continue
                         
-                    match = re.match(r'^(\d{2}/\d{2}/\d{2})\s+(.*)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2})$', text)
-                    if match:
-                        date = match.group(1)
-                        desc = match.group(2).strip()
-                        amount = abs(clean_amount(match.group(3)))
+                    match_full = re.match(r'^(\d{2}/\d{2}/\d{2})\s+(.*)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2})$', text)
+                    match_nodate = re.match(r'^(.*?)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2})$', text)
+
+                    if match_full:
+                        date = match_full.group(1)
+                        desc = match_full.group(2).strip()
+                        amount = abs(clean_amount(match_full.group(3)))
+                        last_date = date
                         
                         current_tx = {
                             'date': date,
+                            'amount': amount,
+                            'description': desc,
+                            'category': cat
+                        }
+                        details.append(current_tx)
+                    elif match_nodate and last_date and not any(k in text.lower() for k in ['total', 'subtotal', 'balance', 'continued']):
+                        desc = match_nodate.group(1).strip()
+                        amount = abs(clean_amount(match_nodate.group(2)))
+                        
+                        current_tx = {
+                            'date': last_date,
                             'amount': amount,
                             'description': desc,
                             'category': cat
