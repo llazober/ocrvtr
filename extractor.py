@@ -118,16 +118,24 @@ def extract_business_name(words):
     zip_pattern = re.compile(r'\b\d{5}(?:-\d{4})?\b')
     zip_chunks = []
     for chunk in processed_chunks:
-        txt_lower = chunk['text'].lower()
+        txt = chunk['text']
+        txt_lower = txt.lower()
         if 'p.o. box' in txt_lower or 'po box' in txt_lower:
-            pass
-        if zip_pattern.search(chunk['text']) and chunk['min_x'] < 600:
+            continue
+        # Filter out presort mail barcode tracking lines from being selected as zip chunks
+        if '#' in txt or '@' in txt or re.search(r'\b(AV|MB|AI|AUTO|PRESORT|SORT|DIGIT|CR|RT|PRSRT|STD)\b', txt, re.IGNORECASE) or re.search(r'\b0\.\d{3}\b', txt) or re.search(r'\b\d{4,}\s+\d+', txt):
+            continue
+            
+        if zip_pattern.search(txt) and chunk['min_x'] < 600:
             zip_chunks.append(chunk)
             
     if not zip_chunks:
         relaxed_pattern = re.compile(r'\b\d{5}\b')
         for chunk in processed_chunks:
-            if relaxed_pattern.search(chunk['text']) and chunk['min_x'] < 600:
+            txt = chunk['text']
+            if '#' in txt or '@' in txt or re.search(r'\b(AV|MB|AI|AUTO|PRESORT|SORT|DIGIT|CR|RT|PRSRT|STD)\b', txt, re.IGNORECASE) or re.search(r'\b0\.\d{3}\b', txt) or re.search(r'\b\d{4,}\s+\d+', txt):
+                continue
+            if relaxed_pattern.search(txt) and chunk['min_x'] < 600:
                 zip_chunks.append(chunk)
                 
     if not zip_chunks:
@@ -151,10 +159,12 @@ def extract_business_name(words):
             ]):
                 continue
             # Filter out pure numbers or short codes (e.g. mail sorting codes)
-            if re.match(r'^[\d\s\-C]+$', txt) or len(txt) <= 3:
+            if re.match(r'^[\d\s\-C|.]+$', txt) or len(txt) <= 3:
                 continue
             # Filter out mail presort barcode / tracking lines (contain #, @, AV, MB, presort codes or digit sequences)
             if '#' in txt or '@' in txt or re.search(r'\b(AV|MB|AI|AUTO|PRESORT|SORT|DIGIT|CR|RT|PRSRT|STD)\b', txt, re.IGNORECASE) or re.search(r'\b0\.\d{3}\b', txt) or re.search(r'\b\d{4,}\s+\d+', txt):
+                continue
+            if not re.search(r'[a-zA-Z]{2,}', txt):
                 continue
                 
             address_candidates.append(chunk)
