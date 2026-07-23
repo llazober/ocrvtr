@@ -812,9 +812,28 @@ async def read_index(request: Request, msg: str = "", error: str = ""):
     if not client_conf or "csv_mapping" not in client_conf:
         client_conf = {"csv_mapping": DEFAULT_CSV_MAPPING}
 
+def fetch_qbo_company_name(access_token: str, realm_id: str) -> str:
+    base_url = get_qbo_api_base_url(realm_id)
+    url = f"{base_url}/companyinfo/{realm_id}?minorversion=65"
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json"
+    })
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            cinfo = data.get("CompanyInfo", {})
+            return cinfo.get("CompanyName", "") or ""
+    except Exception as e:
+        print(f"Error fetching QBO company name: {e}")
+        return ""
+
     # Check QBO connection status
     qbo_token, qbo_realm_id = get_valid_qbo_access_token(client_id_key)
     qbo_connected = bool(qbo_token and qbo_realm_id)
+    qbo_company_name = ""
+    if qbo_connected:
+        qbo_company_name = fetch_qbo_company_name(qbo_token, qbo_realm_id)
 
     return templates.TemplateResponse(
         request=request,
@@ -826,6 +845,7 @@ async def read_index(request: Request, msg: str = "", error: str = ""):
             "software_name": software_name or "",
             "qbo_connected": qbo_connected,
             "qbo_realm_id": qbo_realm_id or "",
+            "qbo_company_name": qbo_company_name or "",
             "msg": msg,
             "error": error
         }

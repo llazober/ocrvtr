@@ -511,12 +511,15 @@
                             <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main);">Transactions</h3>
                             <span id="txCountBadge" style="background: rgba(225, 0, 255, 0.1); color: #e100ff; border: 1px solid rgba(225, 0, 255, 0.2); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600;">0 records</span>
                         </div>
-                        <div style="display: flex; gap: 10px; align-items: center;">
+                        <div style="display: flex; gap: 8px; align-items: center;">
                             {% if software_name and software_name.lower() == 'qbo' %}
                                 {% if qbo_connected %}
                                     <span style="background: rgba(0, 230, 118, 0.1); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.2); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600;" title="Realm ID: {{ qbo_realm_id }}">
-                                        ✓ Connected to QBO
+                                        ✓ {{ qbo_company_name or 'Connected to QBO' }}
                                     </span>
+                                    <a href="/auth/qbo/login" class="btn" style="padding: 6px 10px; font-size: 0.75rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-muted); text-decoration: none; border-radius: 6px; font-weight: 500;" title="Switch to another QuickBooks Company">
+                                        Switch Company
+                                    </a>
                                     <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-main); font-weight: 500; cursor: pointer; user-select: none; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 10px;">
                                         <input type="checkbox" id="qboBatchCheckbox" checked style="accent-color: #00e676; cursor: pointer; width: 14px; height: 14px;">
                                         Batch into 1 Journal Entry
