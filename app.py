@@ -364,7 +364,7 @@ def record_login(username: str, site: str, ip: str, user_agent: str):
 # ── QuickBooks Online (QBO) OAuth & API Integration ───────────────────────────
 QBO_CLIENT_ID     = os.environ.get("QBO_CLIENT_ID", "")
 QBO_CLIENT_SECRET = os.environ.get("QBO_CLIENT_SECRET", "")
-QBO_REDIRECT_URI  = os.environ.get("QBO_REDIRECT_URI", "https://vrt.datalazo.net/auth/qbo/callback")
+QBO_REDIRECT_URI  = os.environ.get("QBO_REDIRECT_URI", "https://datalazo.net/auth/qbo/callback")
 QBO_ENVIRONMENT   = os.environ.get("QBO_ENVIRONMENT", "sandbox").lower()
 
 QBO_AUTH_URL      = "https://appcenter.intuit.com/connect/oauth2"
