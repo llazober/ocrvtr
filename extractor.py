@@ -1094,13 +1094,14 @@ def run_boa_pipeline(all_pages_words, pdf_path, csv_output=None):
                         desc = match_nodate.group(1).strip()
                         amount = abs(clean_amount(match_nodate.group(2)))
                         
-                        current_tx = {
-                            'date': last_date,
-                            'amount': amount,
-                            'description': desc,
-                            'category': cat
-                        }
-                        details.append(current_tx)
+                        if re.search(r'[a-zA-Z]{2,}', desc):
+                            current_tx = {
+                                'date': last_date,
+                                'amount': amount,
+                                'description': desc,
+                                'category': cat
+                            }
+                            details.append(current_tx)
                     else:
                         if current_tx and not any(k in text for k in ['Total', 'Subtotal', 'balance']):
                             current_tx['description'] += " " + text.strip()
