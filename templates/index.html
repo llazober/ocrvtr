@@ -1012,7 +1012,9 @@
                         const hasWithdrawal = tx.Withdrawals !== null && tx.Withdrawals !== undefined && tx.Withdrawals !== '';
                         tdAcc.style.color = 'var(--text-muted)';
                         tdAcc.style.fontWeight = '500';
-                        tdAcc.textContent = hasDeposit ? '260' : (hasWithdrawal ? '500' : '');
+                        const isPayano = (result.business_name || '').toLowerCase().includes('payano');
+                        const defaultWithdrawalAccount = isPayano ? '656' : '500';
+                        tdAcc.textContent = hasDeposit ? '260' : (hasWithdrawal ? defaultWithdrawalAccount : '');
                         tr.appendChild(tdAcc);
                         return; // td already appended above
                     } else if (key === 'checknumber') {

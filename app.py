@@ -975,8 +975,11 @@ async def export_to_qbo(request: Request):
     if not transactions:
         raise HTTPException(status_code=400, detail="No transactions provided to sync.")
 
-    # Dynamically resolve Chart of Accounts for 260 and 500
-    debit_acc, credit_acc = resolve_qbo_account_ids(access_token, realm_id, "260", "500")
+    business_name = payload.get("business_name") or ""
+    credit_account_code = "656" if "payano" in str(business_name).lower() else "500"
+
+    # Dynamically resolve Chart of Accounts for 260 and 500/656
+    debit_acc, credit_acc = resolve_qbo_account_ids(access_token, realm_id, "260", credit_account_code)
     if not debit_acc or not credit_acc:
         raise HTTPException(status_code=400, detail="Could not resolve Chart of Accounts in QuickBooks Online.")
 

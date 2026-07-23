@@ -153,6 +153,9 @@ def extract_business_name(words):
             # Filter out pure numbers or short codes (e.g. mail sorting codes)
             if re.match(r'^[\d\s\-C]+$', txt) or len(txt) <= 3:
                 continue
+            # Filter out mail presort barcode / tracking lines (contain #, @, AV, MB, presort codes)
+            if '#' in txt or '@' in txt or re.search(r'\b(AV|MB|AI|AUTO|PRESORT|SORT|DIGIT|CR|RT)\b', txt, re.IGNORECASE):
+                continue
                 
             address_candidates.append(chunk)
             
