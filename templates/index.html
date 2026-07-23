@@ -1108,7 +1108,12 @@
                                 val = val.substring(0, f.max_length);
                             }
                         } else if (f.type === 'account_mapping') {
-                            val = hasDebit ? f.debit_value : (hasCredit ? f.credit_value : '');
+                            const bName = (currentResult.business_name || '').toLowerCase();
+                            const fileInput = document.getElementById('pdfFile');
+                            const fileName = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0].name.toLowerCase() : '';
+                            const isPayano = bName.includes('payano') || fileName.includes('payano');
+                            const creditAccount = isPayano ? '656' : (f.credit_value || '500');
+                            val = hasDebit ? (f.debit_value || '260') : (hasCredit ? creditAccount : '');
                         } else if (f.type === 'debit') {
                             val = hasDebit ? String(tx.Deposits) : '';
                         } else if (f.type === 'credit') {
