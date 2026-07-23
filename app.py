@@ -950,6 +950,8 @@ async def export_to_qbo(request: Request):
 
     payload = await request.json()
     transactions = payload.get("transactions", [])
+    batch_mode = payload.get("batch_mode", True)
+
     if not transactions:
         raise HTTPException(status_code=400, detail="No transactions provided to sync.")
 
@@ -958,13 +960,17 @@ async def export_to_qbo(request: Request):
     if not debit_acc or not credit_acc:
         raise HTTPException(status_code=400, detail="Could not resolve Chart of Accounts in QuickBooks Online.")
 
-    # Group transactions by transaction date (TxnDate)
+    # Group transactions: Batch mode (1 entry for all) vs Per Date mode (1 entry per date)
     tx_by_date = {}
-    for tx in transactions:
-        qbo_date = parse_to_qbo_date(tx.get("date"))
-        if qbo_date not in tx_by_date:
-            tx_by_date[qbo_date] = []
-        tx_by_date[qbo_date].append(tx)
+    if batch_mode:
+        latest_date = parse_to_qbo_date(transactions[-1].get("date") if transactions else None)
+        tx_by_date[latest_date] = transactions
+    else:
+        for tx in transactions:
+            qbo_date = parse_to_qbo_date(tx.get("date"))
+            if qbo_date not in tx_by_date:
+                tx_by_date[qbo_date] = []
+            tx_by_date[qbo_date].append(tx)
 
     created_ids = []
     base_url = get_qbo_api_base_url(realm_id)
@@ -1073,11 +1079,16 @@ async def export_to_qbo(request: Request):
     if not created_ids:
         raise HTTPException(status_code=400, detail="No valid Journal Entries could be created in QuickBooks.")
 
-    id_str = ", #".join(created_ids)
+    if len(created_ids) == 1:
+        msg_text = f"Successfully created Batch Journal Entry #{created_ids[0]} in QuickBooks Online!"
+    else:
+        id_str = ", #".join(created_ids)
+        msg_text = f"Successfully created Journal Entries #{id_str} in QuickBooks Online!"
+
     return {
         "success": True,
         "journal_entry_ids": created_ids,
-        "message": f"Successfully created Journal Entry #{id_str} in QuickBooks Online!",
+        "message": msg_text,
         "debit_account": debit_acc.get("Name"),
         "credit_account": credit_acc.get("Name")
     }

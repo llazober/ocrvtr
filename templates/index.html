@@ -511,12 +511,16 @@
                             <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main);">Transactions</h3>
                             <span id="txCountBadge" style="background: rgba(225, 0, 255, 0.1); color: #e100ff; border: 1px solid rgba(225, 0, 255, 0.2); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600;">0 records</span>
                         </div>
-                        <div style="display: flex; gap: 8px; align-items: center;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
                             {% if software_name and software_name.lower() == 'qbo' %}
                                 {% if qbo_connected %}
                                     <span style="background: rgba(0, 230, 118, 0.1); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.2); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600;" title="Realm ID: {{ qbo_realm_id }}">
                                         ✓ Connected to QBO
                                     </span>
+                                    <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-main); font-weight: 500; cursor: pointer; user-select: none; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 10px;">
+                                        <input type="checkbox" id="qboBatchCheckbox" checked style="accent-color: #00e676; cursor: pointer; width: 14px; height: 14px;">
+                                        Batch into 1 Journal Entry
+                                    </label>
                                     <button class="btn" id="syncQboBtn" style="padding: 8px 16px; font-size: 0.8rem; background: linear-gradient(135deg, #2ca01c 0%, #108000 100%); border: none; color: #ffffff; width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; border-radius: 8px; box-shadow: 0 4px 12px rgba(44, 160, 28, 0.3);">
                                         Sync to QuickBooks
                                     </button>
@@ -1147,10 +1151,14 @@
                 syncQboBtn.style.opacity = '0.7';
 
                 try {
+                    const isBatch = document.getElementById('qboBatchCheckbox') ? document.getElementById('qboBatchCheckbox').checked : true;
                     const response = await fetch('/api/qbo/export', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ transactions: currentResult.transactions })
+                        body: JSON.stringify({ 
+                            transactions: currentResult.transactions,
+                            batch_mode: isBatch
+                        })
                     });
                     const resData = await response.json();
 
