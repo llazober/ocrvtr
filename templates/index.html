@@ -1011,8 +1011,10 @@
                         const hasDeposit = tx.Deposits !== null && tx.Deposits !== undefined && tx.Deposits !== '';
                         const hasWithdrawal = tx.Withdrawals !== null && tx.Withdrawals !== undefined && tx.Withdrawals !== '';
                         tdAcc.style.color = 'var(--text-muted)';
-                        tdAcc.style.fontWeight = '500';
-                        const isPayano = (result.business_name || '').toLowerCase().includes('payano');
+                        const bName = (result.business_name || '').toLowerCase();
+                        const fileInput = document.getElementById('pdfFile');
+                        const fileName = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0].name.toLowerCase() : '';
+                        const isPayano = bName.includes('payano') || fileName.includes('payano');
                         const defaultWithdrawalAccount = isPayano ? '656' : '500';
                         tdAcc.textContent = hasDeposit ? '260' : (hasWithdrawal ? defaultWithdrawalAccount : '');
                         tr.appendChild(tdAcc);
