@@ -961,7 +961,16 @@
             headerRow.style.textAlign = 'left';
             
             const firstTx = result.transactions[0] || {};
-            const keys = Object.keys(firstTx);
+            let keys = Object.keys(firstTx);
+            if (keys.includes('account')) {
+                keys = keys.filter(k => k !== 'account');
+                const dateIdx = keys.indexOf('date');
+                if (dateIdx !== -1) {
+                    keys.splice(dateIdx + 1, 0, 'account');
+                } else {
+                    keys.unshift('account');
+                }
+            }
             
             keys.forEach(key => {
                 const th = document.createElement('th');
@@ -971,14 +980,6 @@
                 }
                 th.textContent = formatHeaderLabel(key);
                 headerRow.appendChild(th);
-
-                // Inject Account header right after Date
-                if (key === 'date') {
-                    const thAcc = document.createElement('th');
-                    thAcc.style.cssText = 'padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);';
-                    thAcc.textContent = 'Account';
-                    headerRow.appendChild(thAcc);
-                }
             });
             tableHead.appendChild(headerRow);
 
@@ -1003,23 +1004,18 @@
                         td.style.color = 'var(--text-main)';
                         td.style.fontWeight = '500';
                         td.textContent = val || '';
-                        tr.appendChild(td);
-
-                        // Inject Account cell right after Date
-                        const tdAcc = document.createElement('td');
-                        tdAcc.style.padding = '12px 16px';
+                    } else if (key === 'account') {
+                        td.style.color = 'var(--text-muted)';
+                        td.style.fontWeight = '500';
                         const hasDeposit = tx.Deposits !== null && tx.Deposits !== undefined && tx.Deposits !== '';
                         const hasWithdrawal = tx.Withdrawals !== null && tx.Withdrawals !== undefined && tx.Withdrawals !== '';
-                        tdAcc.style.color = 'var(--text-muted)';
                         const bName = (result.business_name || '').toLowerCase();
                         const fileInput = document.getElementById('pdfFile');
                         const fileName = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0].name.toLowerCase() : '';
                         const isPayano = bName.includes('payano') || fileName.includes('payano');
                         const defaultWithdrawalAccount = isPayano ? '656' : '500';
                         const mappedAcc = tx.account || (hasDeposit ? '260' : (hasWithdrawal ? defaultWithdrawalAccount : ''));
-                        tdAcc.textContent = mappedAcc;
-                        tr.appendChild(tdAcc);
-                        return; // td already appended above
+                        td.textContent = mappedAcc;
                     } else if (key === 'checknumber') {
                         td.style.color = 'var(--text-muted)';
                         const checkNum = val !== null && val !== undefined && !isNaN(val) ? val : '';

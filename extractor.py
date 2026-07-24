@@ -1714,13 +1714,16 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
         
         mapped_accounts = []
         for _, row in formatted_df.iterrows():
-            desc = str(row.get("Description", "") or "")
-            has_check = bool(row.get("checknumber") and str(row.get("checknumber")).strip() and str(row.get("checknumber")) != "None")
-            has_dep = row.get("Deposits") is not None and str(row.get("Deposits")).strip() != "" and str(row.get("Deposits")) != "None"
+            desc = str(row.get("description") or row.get("Description") or "").strip()
+            chk_val = row.get("checknumber")
+            has_check = bool(chk_val and str(chk_val).strip() and str(chk_val).lower() != "none")
+            
+            dep_val = row.get("Deposits")
+            has_dep = dep_val is not None and str(dep_val).strip() != "" and str(dep_val).lower() != "none"
             
             # If transaction is a Check, keep unassigned (default 500 / 656)
             if has_check or desc.lower().startswith("check"):
-                mapped_accounts.append(default_withdrawal if not has_dep else "260")
+                mapped_accounts.append("260" if has_dep else default_withdrawal)
             else:
                 acct_num, _, _ = match_gl_account(
                     raw_desc=desc,
