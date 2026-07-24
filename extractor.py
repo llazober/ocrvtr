@@ -1704,6 +1704,37 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
         with open(summary_img_path, "rb") as img_file:
             summary_page_image_b64 = base64.b64encode(img_file.read()).decode('utf-8')
             
+    # Run 4-Stage Matching Engine on each transaction using history rules for this client
+    try:
+        from app import get_client_history_rules
+        from matching_engine import match_gl_account
+        
+        history_rules = get_client_history_rules(bus_name) if bus_name else []
+        default_withdrawal = "656" if (bus_name and "payano" in bus_name.lower()) else "500"
+        
+        mapped_accounts = []
+        for _, row in formatted_df.iterrows():
+            desc = str(row.get("Description", "") or "")
+            has_check = bool(row.get("checknumber") and str(row.get("checknumber")).strip() and str(row.get("checknumber")) != "None")
+            has_dep = row.get("Deposits") is not None and str(row.get("Deposits")).strip() != "" and str(row.get("Deposits")) != "None"
+            
+            # If transaction is a Check, keep unassigned (default 500 / 656)
+            if has_check or desc.lower().startswith("check"):
+                mapped_accounts.append(default_withdrawal if not has_dep else "260")
+            else:
+                acct_num, _, _ = match_gl_account(
+                    raw_desc=desc,
+                    history_rules=history_rules,
+                    default_deposit="260",
+                    default_withdrawal=default_withdrawal,
+                    is_deposit=has_dep
+                )
+                mapped_accounts.append(acct_num)
+                
+        formatted_df["account"] = mapped_accounts
+    except Exception as ex:
+        print(f"Error mapping GL accounts during extraction: {ex}")
+
     # Convert NaN to None for JSON compliance
     clean_df = formatted_df.astype(object).where(pd.notnull(formatted_df), None)
     return {

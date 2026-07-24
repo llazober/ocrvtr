@@ -1016,7 +1016,8 @@
                         const fileName = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0].name.toLowerCase() : '';
                         const isPayano = bName.includes('payano') || fileName.includes('payano');
                         const defaultWithdrawalAccount = isPayano ? '656' : '500';
-                        tdAcc.textContent = hasDeposit ? '260' : (hasWithdrawal ? defaultWithdrawalAccount : '');
+                        const mappedAcc = tx.account || (hasDeposit ? '260' : (hasWithdrawal ? defaultWithdrawalAccount : ''));
+                        tdAcc.textContent = mappedAcc;
                         tr.appendChild(tdAcc);
                         return; // td already appended above
                     } else if (key === 'checknumber') {
@@ -1113,7 +1114,7 @@
                             const fileName = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0].name.toLowerCase() : '';
                             const isPayano = bName.includes('payano') || fileName.includes('payano');
                             const creditAccount = isPayano ? '656' : (f.credit_value || '500');
-                            val = hasDebit ? (f.debit_value || '260') : (hasCredit ? creditAccount : '');
+                            val = tx.account || (hasDebit ? (f.debit_value || '260') : (hasCredit ? creditAccount : ''));
                         } else if (f.type === 'debit') {
                             val = hasDebit ? String(tx.Deposits) : '';
                         } else if (f.type === 'credit') {
