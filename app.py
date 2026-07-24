@@ -245,6 +245,71 @@ def get_client_user(username: str) -> dict | None:
         if conn:
             conn.close()
 
+def get_client_coa(client_name: str) -> list[dict]:
+    """Fetch Chart of Accounts list for a client from ClientChartOfAccounts table."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('''
+                SELECT "accountNumber", "accountName", "type", "subType", "level"
+                FROM "ClientChartOfAccounts"
+                WHERE LOWER("clientName") = LOWER(%s) OR "clientName" = 'DEFAULT'
+                ORDER BY "accountNumber" ASC;
+            ''', (client_name,))
+            return cur.fetchall() or []
+    except Exception as e:
+        print(f"Database error fetching COA for {client_name}: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+def get_client_history_rules(client_name: str) -> list[dict]:
+    """Fetch learned vendor matching rules for a client from ClientTransactionHistory table."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('''
+                SELECT "pattern", "accountNumber", "accountName", "transactionType", "useCount"
+                FROM "ClientTransactionHistory"
+                WHERE LOWER("clientName") = LOWER(%s) OR "clientName" = 'DEFAULT'
+                ORDER BY "useCount" DESC;
+            ''', (client_name,))
+            return cur.fetchall() or []
+    except Exception as e:
+        print(f"Database error fetching history rules for {client_name}: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+def save_history_rule(client_name: str, pattern: str, account_number: str, account_name: str = "", tx_type: str = "ALL") -> bool:
+    """Save or update a learned vendor rule in ClientTransactionHistory table."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute('''
+                INSERT INTO "ClientTransactionHistory" ("clientName", "pattern", "accountNumber", "accountName", "transactionType", "source", "useCount")
+                VALUES (%s, %s, %s, %s, %s, 'USER_EDIT', 1)
+                ON CONFLICT ("clientName", "pattern", "transactionType")
+                DO UPDATE SET
+                    "accountNumber" = EXCLUDED."accountNumber",
+                    "accountName" = EXCLUDED."accountName",
+                    "useCount" = "ClientTransactionHistory"."useCount" + 1,
+                    "updatedAt" = CURRENT_TIMESTAMP;
+            ''', (client_name, pattern.upper().strip(), account_number.strip(), account_name.strip(), tx_type))
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Database error saving history rule: {e}")
+        return False
+    finally:
+        if conn:
+            conn.close()
+
 def update_terms_accepted(username: str, ip: str, user_agent: str) -> bool:
     conn = None
     try:
@@ -1115,6 +1180,32 @@ async def export_to_qbo(request: Request):
         "debit_account": debit_acc.get("Name"),
         "credit_account": credit_acc.get("Name")
     }
+
+@app.get("/api/coa")
+async def get_coa_endpoint(request: Request, client_name: str = "Toirak's Group Homes Inc"):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    coa_list = get_client_coa(client_name)
+    return {"success": True, "client_name": client_name, "coa": coa_list}
+
+@app.post("/api/history/learn")
+async def learn_history_rule_endpoint(request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    payload = await request.json()
+    client_name = payload.get("client_name") or "DEFAULT"
+    pattern = payload.get("pattern") or ""
+    account_number = payload.get("account_number") or ""
+    account_name = payload.get("account_name") or ""
+    tx_type = payload.get("transaction_type") or "ALL"
+    
+    if not pattern or not account_number:
+        raise HTTPException(status_code=400, detail="Pattern and account_number are required.")
+        
+    ok = save_history_rule(client_name, pattern, account_number, account_name, tx_type)
+    return {"success": ok, "message": f"Rule learned for '{pattern}' -> {account_number}"}
 
 @app.post("/process")
 async def process_pdf(
