@@ -1704,39 +1704,14 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
         with open(summary_img_path, "rb") as img_file:
             summary_page_image_b64 = base64.b64encode(img_file.read()).decode('utf-8')
             
-    # Run 4-Stage Matching Engine on each transaction using history rules for this client
-    try:
-        from app import get_client_history_rules
-        from matching_engine import match_gl_account
-        
-        history_rules = get_client_history_rules(bus_name) if bus_name else []
-        default_withdrawal = "656" if (bus_name and "payano" in bus_name.lower()) else "500"
-        
-        mapped_accounts = []
-        for _, row in formatted_df.iterrows():
-            desc = str(row.get("description") or row.get("Description") or "").strip()
-            chk_val = row.get("checknumber")
-            has_check = bool(chk_val and str(chk_val).strip() and str(chk_val).lower() != "none")
-            
-            dep_val = row.get("Deposits")
-            has_dep = dep_val is not None and str(dep_val).strip() != "" and str(dep_val).lower() != "none"
-            
-            # If transaction is a Check, keep unassigned (default 500 / 656)
-            if has_check or desc.lower().startswith("check"):
-                mapped_accounts.append("260" if has_dep else default_withdrawal)
-            else:
-                acct_num, _, _ = match_gl_account(
-                    raw_desc=desc,
-                    history_rules=history_rules,
-                    default_deposit="260",
-                    default_withdrawal=default_withdrawal,
-                    is_deposit=has_dep
-                )
-                mapped_accounts.append(acct_num)
-                
-        formatted_df["account"] = mapped_accounts
-    except Exception as ex:
-        print(f"Error mapping GL accounts during extraction: {ex}")
+    # Assign standard account codes: 260 for Deposits, 656 for D'Payano withdrawals, 500 for general withdrawals
+    default_withdrawal = "656" if (bus_name and "payano" in bus_name.lower()) else "500"
+    mapped_accounts = []
+    for _, row in formatted_df.iterrows():
+        dep_val = row.get("Deposits")
+        has_dep = pd.notnull(dep_val) and str(dep_val).strip() != "" and str(dep_val).lower() not in ["none", "nan", "null"]
+        mapped_accounts.append("260" if has_dep else default_withdrawal)
+    formatted_df["account"] = mapped_accounts
 
     # Convert NaN to None for JSON compliance
     clean_df = formatted_df.astype(object).where(pd.notnull(formatted_df), None)
