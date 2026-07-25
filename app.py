@@ -1273,6 +1273,7 @@ async def process_pdf(
     request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    use_history: bool = Form(False),
 ):
     username = get_current_username(request)
     if not username:
@@ -1295,7 +1296,13 @@ async def process_pdf(
         raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {e}")
 
     try:
-        result_data = run_extraction(pdf_path, temp_dir, create_csv=False)
+        result_data = run_extraction(
+            pdf_path, 
+            temp_dir, 
+            create_csv=False, 
+            use_history=use_history, 
+            client_history_fetcher=get_client_history_rules
+        )
         
         # Record usage if logged in as a ClientUser
         current_username = get_current_username(request)

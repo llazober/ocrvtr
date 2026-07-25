@@ -8,6 +8,7 @@ import pandas as pd
 import fitz  # PyMuPDF
 from google.cloud import vision
 from google.oauth2 import service_account
+from matching_engine import match_gl_account
 
 CSV_OUTPUT = "Bank_Details.csv"
 
@@ -1651,7 +1652,7 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
         
     return formatted_df, reconciliation, 1, period, warnings
 
-def run_extraction(pdf_path, temp_dir, create_csv=False):
+def run_extraction(pdf_path, temp_dir, create_csv=False, use_history=False, client_history_fetcher=None):
     convert_pdf_to_png(pdf_path, temp_dir)
     
     client = get_vision_client()
@@ -1704,13 +1705,35 @@ def run_extraction(pdf_path, temp_dir, create_csv=False):
         with open(summary_img_path, "rb") as img_file:
             summary_page_image_b64 = base64.b64encode(img_file.read()).decode('utf-8')
             
-    # Assign standard account codes: 260 for Deposits, 656 for D'Payano withdrawals, 500 for general withdrawals
+    # Assign account codes: defaults vs transaction history matching
     default_withdrawal = "656" if (bus_name and "payano" in bus_name.lower()) else "500"
+    
+    history_rules = []
+    if use_history and client_history_fetcher:
+        try:
+            history_rules = client_history_fetcher(bus_name or "DEFAULT")
+            print(f"--> [GL MATCHING] Loaded {len(history_rules)} transaction history rules for '{bus_name or 'DEFAULT'}'")
+        except Exception as e:
+            print(f"--> [GL MATCHING] Error fetching history rules: {e}")
+
     mapped_accounts = []
     for _, row in formatted_df.iterrows():
         dep_val = row.get("Deposits")
         has_dep = pd.notnull(dep_val) and str(dep_val).strip() != "" and str(dep_val).lower() not in ["none", "nan", "null"]
-        mapped_accounts.append("260" if has_dep else default_withdrawal)
+        raw_desc = str(row.get("Description") or "")
+        
+        if use_history and history_rules:
+            acct_num, acct_name, conf = match_gl_account(
+                raw_desc=raw_desc,
+                history_rules=history_rules,
+                default_deposit="260",
+                default_withdrawal=default_withdrawal,
+                is_deposit=has_dep
+            )
+            mapped_accounts.append(acct_num)
+        else:
+            mapped_accounts.append("260" if has_dep else default_withdrawal)
+
     formatted_df["account"] = mapped_accounts
 
     # Convert NaN to None for JSON compliance

@@ -455,6 +455,16 @@
                     </button>
                 </div>
 
+                <div style="margin: 16px 0; text-align: left;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-main); font-size: 0.88rem; font-weight: 500; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 12px; transition: border-color 0.2s ease;">
+                        <input type="checkbox" id="useHistoryGlCheckbox" style="accent-color: #e100ff; width: 16px; height: 16px; cursor: pointer;">
+                        <span>Auto-assign GL accounts using Client Transaction History</span>
+                    </label>
+                    <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 4px; margin-left: 26px;">
+                        Unchecked (default): Assigns standard default GL codes (260 for Deposits, 500/656 for Withdrawals).
+                    </div>
+                </div>
+
                 <button class="btn" id="processBtn" disabled>Process Statement</button>
             </div>
 
@@ -860,6 +870,8 @@
 
             const formData = new FormData();
             formData.append('file', selectedFile);
+            const useHistoryChecked = document.getElementById('useHistoryGlCheckbox')?.checked || false;
+            formData.append('use_history', useHistoryChecked ? 'true' : 'false');
 
             try {
                 const response = await fetch('/process', {
