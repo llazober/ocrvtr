@@ -117,9 +117,12 @@ def match_gl_account(
             return ("1000", "State / Medicaid Deposits", 0.85)
         if any(k in raw_upper for k in ["SQUARE", "STRIPE", "CLOVER", "TOAST", "SHOPIFY", "MERCHANT"]):
             return ("4000", "Merchant Sales Income", 0.85)
-        return ("1000", "General Bank Deposits", 0.80)
     else:
-        # Expenses / Withdrawals
+        # Check matching: "CHECK", "CHECK #", "CHECK 1234" -> default_withdrawal (500/656)
+        if "CHECK" in raw_upper or raw_upper.startswith("CHECK"):
+            return (default_withdrawal, "Check Payment", 0.85)
+
+        # Expenses / Withdrawals with known vendor keywords
         if any(k in raw_upper for k in ["FORD", "CHEVROLET", "AUTOZONE", "ADVANCE AUTO", "NAPA", "TIRE", "AUTOMOTIVE", "MOTORS", "CAR WASH", "AUTO"]):
             return ("725", "Auto & Vehicle Expense", 0.85)
         if any(k in raw_upper for k in ["SHELL", "CHEVRON", "EXXON", "MOBIL", "BP ", "MARATHON", "WAWA", "RACETRAC", "7-ELEVEN", "GAS STATION", "FUEL"]):
@@ -136,7 +139,7 @@ def match_gl_account(
             return ("745", "Bank Service Charges", 0.85)
         if any(k in raw_upper for k in ["ADP", "GUSTO", "PAYCHEK", "PAYROLL", "PAYCHEX"]):
             return ("600", "Payroll Expenses", 0.85)
-        if any(k in raw_upper for k in ["CHECK "]) or raw_upper.startswith("CHECK "):
-            return ("500", "Check Payments", 0.80)
-        
-        return ("782", "General Operating Expense", 0.80)
+
+    # Stage 4: Safe Fallback (500/656 for withdrawals, 260 for deposits if no pattern matched)
+    fallback_acc = default_deposit if is_deposit else default_withdrawal
+    return (fallback_acc, "Unassigned Fallback", 0.0)
