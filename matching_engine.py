@@ -107,26 +107,36 @@ def match_gl_account(
         acct_name = best_match.get("accountName", "") or "Fuzzy Mapped Account"
         return (acct_num, acct_name, round(highest_ratio, 2))
         
-    # Stage 3.5: Intelligent Banking Keyword Fallbacks
+    # Stage 3.5: Intelligent Banking & Vendor Heuristic Classification
     if is_deposit:
         if any(k in raw_upper for k in ["ZELLE", "VENMO", "CASH APP", "PAYPAL", "WIRE"]):
-            return ("1000", "Customer Deposits / Cash", 0.80)
+            return ("1000", "Customer Deposits / Zelle", 0.85)
+        if any(k in raw_upper for k in ["ATM", "BRANCH DEPOSIT", "MOBILE DEPOSIT", "CHECK DEPOSIT", "EDEPOSIT"]):
+            return ("1000", "Cash & ATM Deposits", 0.85)
         if any(k in raw_upper for k in ["MEDICAID", "GUARDIAN", "CDC PLUS", "APD", "STATE OF"]):
             return ("1000", "State / Medicaid Deposits", 0.85)
         if any(k in raw_upper for k in ["SQUARE", "STRIPE", "CLOVER", "TOAST", "SHOPIFY", "MERCHANT"]):
             return ("4000", "Merchant Sales Income", 0.85)
+        return ("1000", "General Bank Deposits", 0.80)
     else:
-        if any(k in raw_upper for k in ["FEE", "SERVICE CHARGE", "MAINTENANCE", "OVERDRAFT", "UNCOLLECTED"]):
+        # Expenses / Withdrawals
+        if any(k in raw_upper for k in ["FORD", "CHEVROLET", "AUTOZONE", "ADVANCE AUTO", "NAPA", "TIRE", "AUTOMOTIVE", "MOTORS", "CAR WASH", "AUTO"]):
+            return ("725", "Auto & Vehicle Expense", 0.85)
+        if any(k in raw_upper for k in ["SHELL", "CHEVRON", "EXXON", "MOBIL", "BP ", "MARATHON", "WAWA", "RACETRAC", "7-ELEVEN", "GAS STATION", "FUEL"]):
+            return ("725", "Fuel & Auto Mileage", 0.85)
+        if any(k in raw_upper for k in ["PUBLIX", "WALMART", "SEDANOS", "PRESIDENTE", "SUPERMARKET", "GROCERY", "TRADER JOE", "WHOLE FOODS", "CVS", "NAVARR", "WALGREENS", "TARGET", "COSTCO", "BJ'S"]):
+            return ("782", "Supplies & Provisions", 0.85)
+        if any(k in raw_upper for k in ["HOME DEPOT", "LOWES", "ACE HARDWARE", "REPAIR", "PLUMBING", "ROOFING", "ELECTRIC", "HARDWARE", "PAINT"]):
+            return ("778", "Repairs & Maintenance", 0.85)
+        if any(k in raw_upper for k in ["BAKERY", "MCDONALD", "BURGER", "PIZZA", "DELI", "CAFE", "RESTAURANT", "CHICKEN", "TACO", "SUBWAY", "DINER", "GRILL", "SUSHI", "FOOD", "BARBER"]):
+            return ("748", "Meals & Entertainment", 0.85)
+        if any(k in raw_upper for k in ["FPL", "DUKE", "TECO", "WATER DEPT", "CITY OF", "WASTE MGMT", "UTILITY", "AT&T", "ATT", "TMOBILE", "T-MOBILE", "VERIZON", "COMCAST", "XFINITY"]):
+            return ("795", "Utilities & Telecom", 0.85)
+        if any(k in raw_upper for k in ["FEE", "SERVICE CHARGE", "MAINTENANCE FEE", "OVERDRAFT", "UNCOLLECTED"]):
             return ("745", "Bank Service Charges", 0.85)
         if any(k in raw_upper for k in ["ADP", "GUSTO", "PAYCHEK", "PAYROLL", "PAYCHEX"]):
             return ("600", "Payroll Expenses", 0.85)
-        if any(k in raw_upper for k in ["FPL", "DUKE", "TECO", "WATER DEPT", "CITY OF", "WASTE MGMT"]):
-            return ("795", "Utilities", 0.85)
-        if any(k in raw_upper for k in ["SUNPASS", "E-ZPASS", "TOLL"]):
-            return ("725", "Auto & Travel", 0.85)
-        if any(k in raw_upper for k in ["SHELL", "CHEVRON", "EXXON", "MOBIL", "BP ", "MARATHON", "WAWA", "RACETRAC"]):
-            return ("725", "Auto Mileage & Fuel", 0.85)
-
-    # Stage 4: Safe Fallback
-    fallback_acc = default_deposit if is_deposit else default_withdrawal
-    return (fallback_acc, "Unassigned Fallback", 0.0)
+        if any(k in raw_upper for k in ["CHECK "]) or raw_upper.startswith("CHECK "):
+            return ("500", "Check Payments", 0.80)
+        
+        return ("782", "General Operating Expense", 0.80)

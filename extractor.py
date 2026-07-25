@@ -1724,7 +1724,7 @@ def run_extraction(pdf_path, temp_dir, create_csv=False, use_history=False, clie
     for _, row in formatted_df.iterrows():
         dep_val = row.get("Deposits")
         has_dep = pd.notnull(dep_val) and str(dep_val).strip() != "" and str(dep_val).lower() not in ["none", "nan", "null"]
-        raw_desc = str(row.get("Description") or "")
+        raw_desc = str(row.get("description") or row.get("Description") or "")
         
         if use_history and history_rules:
             acct_num, acct_name, conf = match_gl_account(
