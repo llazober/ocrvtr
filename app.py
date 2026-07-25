@@ -327,24 +327,45 @@ def get_client_coa(client_name: str) -> list[dict]:
             conn.close()
 
 def get_client_history_rules(client_name: str) -> list[dict]:
-    """Fetch learned vendor matching rules for a client from ClientTransactionHistory table."""
+    """Fetch learned vendor matching rules from ClientTransactionHistory table with fallbacks."""
     conn = None
+    rules = []
     try:
         conn = get_db_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute('''
-                SELECT "pattern", "accountNumber", "accountName", "transactionType", "useCount"
-                FROM "ClientTransactionHistory"
-                WHERE LOWER("clientName") = LOWER(%s) OR "clientName" = 'DEFAULT'
-                ORDER BY "useCount" DESC;
-            ''', (client_name,))
-            return cur.fetchall() or []
+            if client_name:
+                cur.execute('''
+                    SELECT "pattern", "accountNumber", "accountName", "transactionType", "useCount"
+                    FROM "ClientTransactionHistory"
+                    WHERE LOWER("clientName") = LOWER(%s) OR "clientName" = 'DEFAULT'
+                    ORDER BY "useCount" DESC;
+                ''', (client_name,))
+                rules = cur.fetchall() or []
+            
+            if not rules:
+                cur.execute('''
+                    SELECT "pattern", "accountNumber", "accountName", "transactionType", "useCount"
+                    FROM "ClientTransactionHistory"
+                    ORDER BY "useCount" DESC;
+                ''')
+                rules = cur.fetchall() or []
     except Exception as e:
         print(f"Database error fetching history rules for {client_name}: {e}")
-        return []
     finally:
         if conn:
             conn.close()
+
+    if not rules:
+        try:
+            json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "toirak_mapped_rules.json")
+            if os.path.exists(json_path):
+                with open(json_path, "r", encoding="utf-8") as f:
+                    rules = json.load(f)
+                print(f"--> Loaded {len(rules)} fallback rules from toirak_mapped_rules.json")
+        except Exception as ex:
+            print(f"Error loading toirak_mapped_rules.json: {ex}")
+
+    return rules
 
 def save_history_rule(client_name: str, pattern: str, account_number: str, account_name: str = "", tx_type: str = "ALL") -> bool:
     """Save or update a learned vendor rule in ClientTransactionHistory table."""
