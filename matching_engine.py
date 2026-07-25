@@ -81,9 +81,12 @@ def match_gl_account(
         if clean_desc == pattern or raw_upper == pattern:
             return (acct_num, acct_name, 1.0)
             
-        # Substring containment: pattern is inside clean_desc or raw_upper
-        if len(pattern) >= 3 and (pattern in clean_desc or pattern in raw_upper):
-            return (acct_num, acct_name, 0.95)
+        # Word boundary match for short patterns (e.g. WM, BP, TD, AA) or substring match for patterns
+        if len(pattern) >= 2:
+            if re.search(r'\b' + re.escape(pattern) + r'\b', raw_upper) or re.search(r'\b' + re.escape(pattern) + r'\b', clean_desc):
+                return (acct_num, acct_name, 0.95)
+            if len(pattern) >= 3 and (pattern in clean_desc or pattern in raw_upper):
+                return (acct_num, acct_name, 0.95)
             
     # Stage 3: Fuzzy Close-Matching (Similarity Algorithm)
     best_match = None
