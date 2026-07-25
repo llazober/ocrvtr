@@ -81,8 +81,8 @@ def match_gl_account(
         if clean_desc == pattern or raw_upper == pattern:
             return (acct_num, acct_name, 1.0)
             
-        # Substring containment (if pattern is in clean_desc or clean_desc is in pattern)
-        if (len(pattern) >= 3 and pattern in clean_desc) or (len(clean_desc) >= 3 and clean_desc in pattern):
+        # Substring containment: pattern is inside clean_desc or raw_upper
+        if len(pattern) >= 3 and (pattern in clean_desc or pattern in raw_upper):
             return (acct_num, acct_name, 0.95)
             
     # Stage 3: Fuzzy Close-Matching (Similarity Algorithm)
@@ -107,6 +107,26 @@ def match_gl_account(
         acct_name = best_match.get("accountName", "") or "Fuzzy Mapped Account"
         return (acct_num, acct_name, round(highest_ratio, 2))
         
+    # Stage 3.5: Intelligent Banking Keyword Fallbacks
+    if is_deposit:
+        if any(k in raw_upper for k in ["ZELLE", "VENMO", "CASH APP", "PAYPAL", "WIRE"]):
+            return ("1000", "Customer Deposits / Cash", 0.80)
+        if any(k in raw_upper for k in ["MEDICAID", "GUARDIAN", "CDC PLUS", "APD", "STATE OF"]):
+            return ("1000", "State / Medicaid Deposits", 0.85)
+        if any(k in raw_upper for k in ["SQUARE", "STRIPE", "CLOVER", "TOAST", "SHOPIFY", "MERCHANT"]):
+            return ("4000", "Merchant Sales Income", 0.85)
+    else:
+        if any(k in raw_upper for k in ["FEE", "SERVICE CHARGE", "MAINTENANCE", "OVERDRAFT", "UNCOLLECTED"]):
+            return ("745", "Bank Service Charges", 0.85)
+        if any(k in raw_upper for k in ["ADP", "GUSTO", "PAYCHEK", "PAYROLL", "PAYCHEX"]):
+            return ("600", "Payroll Expenses", 0.85)
+        if any(k in raw_upper for k in ["FPL", "DUKE", "TECO", "WATER DEPT", "CITY OF", "WASTE MGMT"]):
+            return ("795", "Utilities", 0.85)
+        if any(k in raw_upper for k in ["SUNPASS", "E-ZPASS", "TOLL"]):
+            return ("725", "Auto & Travel", 0.85)
+        if any(k in raw_upper for k in ["SHELL", "CHEVRON", "EXXON", "MOBIL", "BP ", "MARATHON", "WAWA", "RACETRAC"]):
+            return ("725", "Auto Mileage & Fuel", 0.85)
+
     # Stage 4: Safe Fallback
     fallback_acc = default_deposit if is_deposit else default_withdrawal
     return (fallback_acc, "Unassigned Fallback", 0.0)

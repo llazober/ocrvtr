@@ -1717,6 +1717,10 @@ def run_extraction(pdf_path, temp_dir, create_csv=False, use_history=False, clie
             print(f"--> [GL MATCHING] Error fetching history rules: {e}")
 
     mapped_accounts = []
+    mapped_names = []
+    mapped_confidences = []
+    mapped_sources = []
+
     for _, row in formatted_df.iterrows():
         dep_val = row.get("Deposits")
         has_dep = pd.notnull(dep_val) and str(dep_val).strip() != "" and str(dep_val).lower() not in ["none", "nan", "null"]
@@ -1731,10 +1735,19 @@ def run_extraction(pdf_path, temp_dir, create_csv=False, use_history=False, clie
                 is_deposit=has_dep
             )
             mapped_accounts.append(acct_num)
+            mapped_names.append(acct_name)
+            mapped_confidences.append(conf)
+            mapped_sources.append("Matched" if conf > 0 else "Default")
         else:
             mapped_accounts.append("260" if has_dep else default_withdrawal)
+            mapped_names.append("Default Deposit" if has_dep else "Default Expense")
+            mapped_confidences.append(0.0)
+            mapped_sources.append("Default")
 
     formatted_df["account"] = mapped_accounts
+    formatted_df["account_name"] = mapped_names
+    formatted_df["match_confidence"] = mapped_confidences
+    formatted_df["match_source"] = mapped_sources
 
     # Convert NaN to None for JSON compliance
     clean_df = formatted_df.astype(object).where(pd.notnull(formatted_df), None)
