@@ -155,6 +155,67 @@ def get_request_host(request: Request) -> str:
         host = request.headers.get("host", "")
     return host.split(":")[0].strip().lower()
 
+def is_private_ip(ip: str) -> bool:
+    if not ip:
+        return True
+    clean_ip = ip.strip().replace("::ffff:", "")
+    if clean_ip in ("127.0.0.1", "::1", "localhost"):
+        return True
+    parts = clean_ip.split(".")
+    if len(parts) == 4 and all(p.isdigit() for p in parts):
+        p0, p1 = int(parts[0]), int(parts[1])
+        if p0 == 10:
+            return True
+        if p0 == 172 and 16 <= p1 <= 31:
+            return True
+        if p0 == 192 and p1 == 168:
+            return True
+        if p0 == 169 and p1 == 254:
+            return True
+        if p0 == 127:
+            return True
+    return False
+
+def get_real_client_ip(request: Request) -> str:
+    """Extract real client IP address, handling Cloudflare, proxies, and filtering private IPs (like 10.1.0.10)."""
+    candidates = []
+
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        candidates.append(cf_ip)
+
+    true_client_ip = request.headers.get("true-client-ip")
+    if true_client_ip:
+        candidates.append(true_client_ip)
+
+    x_real_ip = request.headers.get("x-real-ip")
+    if x_real_ip:
+        candidates.append(x_real_ip)
+
+    x_client_ip = request.headers.get("x-client-ip")
+    if x_client_ip:
+        candidates.append(x_client_ip)
+
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        for ip in x_forwarded_for.split(","):
+            candidates.append(ip.strip())
+
+    if request.client and request.client.host:
+        candidates.append(request.client.host)
+
+    for raw_ip in candidates:
+        clean = raw_ip.strip().replace("::ffff:", "")
+        if clean and not is_private_ip(clean):
+            return clean
+
+    for raw_ip in candidates:
+        clean = raw_ip.strip().replace("::ffff:", "")
+        if clean:
+            return clean
+
+    return "127.0.0.1"
+
 def is_user_allowed_on_site(username: str, request: Request) -> tuple[bool, str]:
     """
     Checks if the given user is allowed to log in or access the application on the current request host.
@@ -728,7 +789,7 @@ async def login_submit(
                         status_code=400
                     )
                 else:
-                    client_ip = request.client.host if request.client else "unknown"
+                    client_ip = get_real_client_ip(request)
                     user_agent = request.headers.get("user-agent", "")
                     update_terms_accepted(username_clean, client_ip, user_agent)
             
@@ -736,7 +797,7 @@ async def login_submit(
             token = create_user_session(username_clean)
             
             # Record login log
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = get_real_client_ip(request)
             user_agent = request.headers.get("user-agent", "")
             site_host = get_request_host(request)
             record_login(username_clean, site_host, client_ip, user_agent)
@@ -770,7 +831,7 @@ async def login_submit(
         token = create_user_session(username_clean)
         
         # Record login log
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = get_real_client_ip(request)
         user_agent = request.headers.get("user-agent", "")
         site_host = get_request_host(request)
         record_login(username_clean, site_host, client_ip, user_agent)
