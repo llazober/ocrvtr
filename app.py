@@ -306,28 +306,78 @@ def get_client_user(username: str) -> dict | None:
         if conn:
             conn.close()
 
-def get_client_coa(client_name: str) -> list[dict]:
-    """Fetch Chart of Accounts list for a client from ClientChartOfAccounts table."""
+def normalize_parent_name(parent_name: str | None) -> str:
+    """
+    Normalizes parent company name.
+    If parent_name is empty/missing or 'Datalazo LLC' / 'Datalazo', map to 'VRT Services'.
+    """
+    if not parent_name:
+        return "VRT Services"
+    p = str(parent_name).strip()
+    if p.lower() in ("datalazo llc", "datalazo"):
+        return "VRT Services"
+    return p
+
+def get_user_parent_name(username: str) -> str:
+    """Fetch the parent company name for a given user from their Client account, defaulting to VRT Services."""
+    user = get_client_user(username)
+    if not user:
+        return "VRT Services"
+    client_id = user.get("clientId")
+    if not client_id:
+        return "VRT Services"
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('SELECT company, name FROM "Client" WHERE id = %s;', (client_id,))
+            client = cur.fetchone()
+            if client:
+                parent = (client.get("company") or client.get("name") or "").strip()
+                return normalize_parent_name(parent)
+    except Exception as e:
+        print(f"Database error fetching client parent name: {e}")
+    finally:
+        if conn:
+            conn.close()
+    return "VRT Services"
+
+def get_client_coa(client_name: str, parent_name: str = None) -> list[dict]:
+    """Fetch Chart of Accounts list for a client from ClientChartOfAccounts table filtering by clientName and parentName."""
+    parent_name = normalize_parent_name(parent_name)
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute('''
-                SELECT "accountNumber", "accountName", "type", "subType", "level"
+                SELECT "accountNumber", "accountName", "type", "subType", "level", "parentName"
+                FROM "ClientChartOfAccounts"
+                WHERE (LOWER("clientName") = LOWER(%s) OR "clientName" = 'DEFAULT')
+                  AND (LOWER("parentName") = LOWER(%s) OR "parentName" IS NULL OR "parentName" = '' OR "parentName" = 'VRT Services')
+                ORDER BY "accountNumber" ASC;
+            ''', (client_name, parent_name))
+            records = cur.fetchall() or []
+            if records:
+                return records
+
+            # Fallback query matching clientName only if no records found with parentName filter
+            cur.execute('''
+                SELECT "accountNumber", "accountName", "type", "subType", "level", "parentName"
                 FROM "ClientChartOfAccounts"
                 WHERE LOWER("clientName") = LOWER(%s) OR "clientName" = 'DEFAULT'
                 ORDER BY "accountNumber" ASC;
             ''', (client_name,))
             return cur.fetchall() or []
     except Exception as e:
-        print(f"Database error fetching COA for {client_name}: {e}")
+        print(f"Database error fetching COA for {client_name} (Parent: {parent_name}): {e}")
         return []
     finally:
         if conn:
             conn.close()
 
-def get_client_history_rules(client_name: str) -> list[dict]:
-    """Fetch learned vendor matching rules from ClientTransactionHistory table with fallbacks."""
+def get_client_history_rules(client_name: str, parent_name: str = None) -> list[dict]:
+    """Fetch learned vendor matching rules from ClientTransactionHistory table with fallbacks for parentName."""
+    parent_name = normalize_parent_name(parent_name)
     conn = None
     rules = []
     try:
@@ -335,22 +385,32 @@ def get_client_history_rules(client_name: str) -> list[dict]:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             if client_name:
                 cur.execute('''
-                    SELECT "pattern", "accountNumber", "accountName", "transactionType", "useCount"
+                    SELECT "pattern", "accountNumber", "accountName", "transactionType", "useCount", "parentName"
+                    FROM "ClientTransactionHistory"
+                    WHERE (LOWER("clientName") = LOWER(%s) OR "clientName" = 'DEFAULT')
+                      AND (LOWER("parentName") = LOWER(%s) OR "parentName" IS NULL OR "parentName" = '' OR "parentName" = 'VRT Services')
+                    ORDER BY "useCount" DESC;
+                ''', (client_name, parent_name))
+                rules = cur.fetchall() or []
+            
+            if not rules and client_name:
+                cur.execute('''
+                    SELECT "pattern", "accountNumber", "accountName", "transactionType", "useCount", "parentName"
                     FROM "ClientTransactionHistory"
                     WHERE LOWER("clientName") = LOWER(%s) OR "clientName" = 'DEFAULT'
                     ORDER BY "useCount" DESC;
                 ''', (client_name,))
                 rules = cur.fetchall() or []
-            
+
             if not rules:
                 cur.execute('''
-                    SELECT "pattern", "accountNumber", "accountName", "transactionType", "useCount"
+                    SELECT "pattern", "accountNumber", "accountName", "transactionType", "useCount", "parentName"
                     FROM "ClientTransactionHistory"
                     ORDER BY "useCount" DESC;
                 ''')
                 rules = cur.fetchall() or []
     except Exception as e:
-        print(f"Database error fetching history rules for {client_name}: {e}")
+        print(f"Database error fetching history rules for {client_name} (Parent: {parent_name}): {e}")
     finally:
         if conn:
             conn.close()
@@ -367,22 +427,24 @@ def get_client_history_rules(client_name: str) -> list[dict]:
 
     return rules
 
-def save_history_rule(client_name: str, pattern: str, account_number: str, account_name: str = "", tx_type: str = "ALL") -> bool:
+def save_history_rule(client_name: str, pattern: str, account_number: str, account_name: str = "", tx_type: str = "ALL", parent_name: str = None) -> bool:
     """Save or update a learned vendor rule in ClientTransactionHistory table."""
+    parent_name = normalize_parent_name(parent_name)
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
             cur.execute('''
-                INSERT INTO "ClientTransactionHistory" ("clientName", "pattern", "accountNumber", "accountName", "transactionType", "source", "useCount")
-                VALUES (%s, %s, %s, %s, %s, 'USER_EDIT', 1)
+                INSERT INTO "ClientTransactionHistory" ("clientName", "parentName", "pattern", "accountNumber", "accountName", "transactionType", "source", "useCount")
+                VALUES (%s, %s, %s, %s, %s, %s, 'USER_EDIT', 1)
                 ON CONFLICT ("clientName", "pattern", "transactionType")
                 DO UPDATE SET
+                    "parentName" = EXCLUDED."parentName",
                     "accountNumber" = EXCLUDED."accountNumber",
                     "accountName" = EXCLUDED."accountName",
                     "useCount" = "ClientTransactionHistory"."useCount" + 1,
                     "updatedAt" = CURRENT_TIMESTAMP;
-            ''', (client_name, pattern.upper().strip(), account_number.strip(), account_name.strip(), tx_type))
+            ''', (client_name, parent_name, pattern.upper().strip(), account_number.strip(), account_name.strip(), tx_type))
             conn.commit()
             return True
     except Exception as e:
@@ -1264,12 +1326,13 @@ async def export_to_qbo(request: Request):
     }
 
 @app.get("/api/coa")
-async def get_coa_endpoint(request: Request, client_name: str = "Toirak's Group Homes Inc"):
+async def get_coa_endpoint(request: Request, client_name: str = "Toirak's Group Homes Inc", parent_name: str = None):
     username = get_current_username(request)
     if not username:
         raise HTTPException(status_code=401, detail="Not authenticated.")
-    coa_list = get_client_coa(client_name)
-    return {"success": True, "client_name": client_name, "coa": coa_list}
+    resolved_parent = parent_name or get_user_parent_name(username)
+    coa_list = get_client_coa(client_name, resolved_parent)
+    return {"success": True, "client_name": client_name, "parent_name": resolved_parent, "coa": coa_list}
 
 @app.post("/api/history/learn")
 async def learn_history_rule_endpoint(request: Request):
@@ -1278,6 +1341,7 @@ async def learn_history_rule_endpoint(request: Request):
         raise HTTPException(status_code=401, detail="Not authenticated.")
     payload = await request.json()
     client_name = payload.get("client_name") or "DEFAULT"
+    parent_name = payload.get("parent_name") or get_user_parent_name(username)
     pattern = payload.get("pattern") or ""
     account_number = payload.get("account_number") or ""
     account_name = payload.get("account_name") or ""
@@ -1286,7 +1350,7 @@ async def learn_history_rule_endpoint(request: Request):
     if not pattern or not account_number:
         raise HTTPException(status_code=400, detail="Pattern and account_number are required.")
         
-    ok = save_history_rule(client_name, pattern, account_number, account_name, tx_type)
+    ok = save_history_rule(client_name, pattern, account_number, account_name, tx_type, parent_name)
     return {"success": ok, "message": f"Rule learned for '{pattern}' -> {account_number}"}
 
 @app.post("/process")
@@ -1295,6 +1359,7 @@ async def process_pdf(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     use_history: bool = Form(False),
+    parent_name: str = Form(None),
 ):
     username = get_current_username(request)
     if not username:
@@ -1306,6 +1371,8 @@ async def process_pdf(
 
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+
+    user_parent = parent_name or get_user_parent_name(username)
 
     temp_dir = tempfile.mkdtemp()
     pdf_path = os.path.join(temp_dir, "input.pdf")
@@ -1322,7 +1389,8 @@ async def process_pdf(
             temp_dir, 
             create_csv=False, 
             use_history=use_history, 
-            client_history_fetcher=get_client_history_rules
+            client_history_fetcher=get_client_history_rules,
+            parent_name=user_parent
         )
         
         # Record usage if logged in as a ClientUser

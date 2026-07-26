@@ -1652,7 +1652,7 @@ def run_truist_pipeline(all_pages_words, pdf_path, csv_output=None):
         
     return formatted_df, reconciliation, 1, period, warnings
 
-def run_extraction(pdf_path, temp_dir, create_csv=False, use_history=False, client_history_fetcher=None):
+def run_extraction(pdf_path, temp_dir, create_csv=False, use_history=False, client_history_fetcher=None, parent_name=None):
     convert_pdf_to_png(pdf_path, temp_dir)
     
     client = get_vision_client()
@@ -1711,8 +1711,13 @@ def run_extraction(pdf_path, temp_dir, create_csv=False, use_history=False, clie
     history_rules = []
     if use_history and client_history_fetcher:
         try:
-            history_rules = client_history_fetcher(bus_name or "DEFAULT")
-            print(f"--> [GL MATCHING] Loaded {len(history_rules)} transaction history rules for '{bus_name or 'DEFAULT'}'")
+            import inspect
+            sig = inspect.signature(client_history_fetcher)
+            if len(sig.parameters) >= 2:
+                history_rules = client_history_fetcher(bus_name or "DEFAULT", parent_name)
+            else:
+                history_rules = client_history_fetcher(bus_name or "DEFAULT")
+            print(f"--> [GL MATCHING] Loaded {len(history_rules)} transaction history rules for '{bus_name or 'DEFAULT'}' (Parent: '{parent_name}')")
         except Exception as e:
             print(f"--> [GL MATCHING] Error fetching history rules: {e}")
 
