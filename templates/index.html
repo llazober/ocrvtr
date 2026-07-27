@@ -837,7 +837,7 @@
                         📊 Chart of Accounts <span style="color: #22d3ee;">Manager</span>
                     </h3>
                     <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
-                        Parent: <strong style="color: #22d3ee;" id="coaParentNameDisplay">{{ company_name or 'VRT Services' }}</strong> — View, add, edit, delete, or upload Chart of Accounts CSV files.
+                        Parent: <strong style="color: #22d3ee;" id="coaParentNameDisplay">{{ parent_name or company_name or 'VRT Services' }}</strong> — View, add, edit, delete, or upload Chart of Accounts CSV files.
                     </p>
                 </div>
                 <button onclick="closeCoaModal()" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
@@ -845,8 +845,8 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Client:</label>
-                    <input type="text" id="coaClientInput" value="{{ company_name or '' }}" placeholder="Client Name" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;" onchange="fetchCoaRecords()">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Select Client:</label>
+                    <select id="coaClientSelect" style="background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;" onchange="fetchCoaRecords()"></select>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <input type="text" id="coaSearchInput" placeholder="Search account code or name..." style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; width: 220px; outline: none;" oninput="renderCoaTable()">
@@ -919,7 +919,7 @@
                         🔗 Parent-Client <span style="color: #c084fc;">Mappings Manager</span>
                     </h3>
                     <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
-                        Parent: <strong style="color: #c084fc;" id="mappingsParentDisplay">{{ company_name or 'VRT Services' }}</strong> — View and add client names for this company.
+                        Parent: <strong style="color: #c084fc;" id="mappingsParentDisplay">{{ parent_name or company_name or 'VRT Services' }}</strong> — View and add client names for this company.
                     </p>
                 </div>
                 <button onclick="closeMappingsModal()" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
@@ -928,7 +928,7 @@
             <form style="background: rgba(255,255,255,0.03); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: flex-end;" onsubmit="saveParentMappingRecord(event)">
                 <div>
                     <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Parent / Company Name *</label>
-                    <input type="text" id="mapFormParent" readonly value="{{ company_name or 'VRT Services' }}" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #cbd5e1; opacity: 0.8;">
+                    <input type="text" id="mapFormParent" readonly value="{{ parent_name or company_name or 'VRT Services' }}" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #cbd5e1; opacity: 0.8;">
                 </div>
                 <div>
                     <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Enter Client Name *</label>
@@ -967,7 +967,7 @@
                         📜 Transaction History <span style="color: #34d399;">Rules Manager</span>
                     </h3>
                     <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
-                        Parent: <strong style="color: #34d399;" id="historyParentNameDisplay">{{ company_name or 'VRT Services' }}</strong> — View, add, edit, delete, or upload vendor transaction matching rules.
+                        Parent: <strong style="color: #34d399;" id="historyParentNameDisplay">{{ parent_name or company_name or 'VRT Services' }}</strong> — View, add, edit, delete, or upload vendor transaction matching rules.
                     </p>
                 </div>
                 <button onclick="closeHistoryModal()" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
@@ -975,8 +975,8 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Client:</label>
-                    <input type="text" id="historyClientInput" value="{{ company_name or '' }}" placeholder="Client Name" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;" onchange="fetchHistoryRecords()">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Select Client:</label>
+                    <select id="historyClientSelect" style="background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;" onchange="fetchHistoryRecords()"></select>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <input type="text" id="historySearchInput" placeholder="Search vendor pattern or code..." style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; width: 220px; outline: none;" oninput="renderHistoryTable()">
@@ -1769,12 +1769,63 @@
             }, 1000);
         }
         // --- COA, Parent Mappings, and History Modal Logic ---
+        const CURRENT_PARENT_NAME = {{ parent_name | tojson | safe }} || {{ company_name | tojson | safe }} || 'VRT Services';
+
         let currentCoaRecords = [];
         let currentParentMappings = [];
         let currentHistoryRecords = [];
 
         let historySortKey = 'accountNumber';
         let historySortOrder = 'asc';
+
+        // Helper to sync client select dropdowns across COA and History modals
+        async function syncClientSelectDropdowns() {
+            try {
+                const res = await fetch(`/api/clients/parent-mappings?parentName=${encodeURIComponent(CURRENT_PARENT_NAME)}`);
+                const data = await res.json();
+                currentParentMappings = (data.mappings || []).filter(m => 
+                    (m.parentName || '').trim().toLowerCase() === CURRENT_PARENT_NAME.trim().toLowerCase()
+                );
+                
+                let clientList = currentParentMappings.map(m => m.clientName.trim());
+                clientList = Array.from(new Set(clientList));
+
+                if (clientList.length === 0) {
+                    clientList = [CURRENT_PARENT_NAME];
+                }
+
+                // Update COA client select
+                const coaSelect = document.getElementById('coaClientSelect');
+                if (coaSelect) {
+                    const currentVal = coaSelect.value;
+                    coaSelect.innerHTML = clientList.map(name => `<option value="${name}">${name}</option>`).join('');
+                    if (currentVal && clientList.includes(currentVal)) {
+                        coaSelect.value = currentVal;
+                    } else {
+                        coaSelect.value = clientList[0];
+                    }
+                }
+
+                // Update History client select
+                const historySelect = document.getElementById('historyClientSelect');
+                if (historySelect) {
+                    const currentVal = historySelect.value;
+                    historySelect.innerHTML = clientList.map(name => `<option value="${name}">${name}</option>`).join('');
+                    if (currentVal && clientList.includes(currentVal)) {
+                        historySelect.value = currentVal;
+                    } else {
+                        historySelect.value = clientList[0];
+                    }
+                }
+            } catch (err) {
+                console.error('Error syncing client dropdowns:', err);
+            }
+        }
+
+        // Initialize dropdowns on load
+        document.addEventListener('DOMContentLoaded', () => {
+            syncClientSelectDropdowns();
+        });
 
         // Modal Triggers
         const openCoaModalBtn = document.getElementById('openCoaModalBtn');
@@ -1792,13 +1843,14 @@
         }
 
         // COA Modal
-        function openCoaModal() {
+        async function openCoaModal() {
             const modal = document.getElementById('coaModal');
             if (!modal) return;
             modal.style.display = 'flex';
             modal.offsetHeight;
             modal.style.opacity = '1';
             if (modal.children[0]) modal.children[0].style.transform = 'scale(1)';
+            await syncClientSelectDropdowns();
             fetchCoaRecords();
         }
 
@@ -1811,14 +1863,14 @@
         }
 
         async function fetchCoaRecords() {
-            const clientInput = document.getElementById('coaClientInput');
-            const clientName = clientInput ? clientInput.value.trim() : '';
+            const clientSelect = document.getElementById('coaClientSelect');
+            const clientName = clientSelect ? clientSelect.value.trim() : CURRENT_PARENT_NAME;
             const tbody = document.getElementById('coaTableBody');
             if (tbody) {
                 tbody.innerHTML = '<tr><td colSpan="5" style="padding: 24px; text-align: center; color: #94a3b8;">Loading accounts...</td></tr>';
             }
             try {
-                const res = await fetch(`/api/clients/coa?clientName=${encodeURIComponent(clientName)}`);
+                const res = await fetch(`/api/clients/coa?clientName=${encodeURIComponent(clientName)}&parentName=${encodeURIComponent(CURRENT_PARENT_NAME)}`);
                 const data = await res.json();
                 currentCoaRecords = data.accounts || [];
                 renderCoaTable();
@@ -1849,7 +1901,7 @@
 
             tbody.innerHTML = filtered.map(acct => `
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 10px 16px; font-weight: 700; color: #67e8f9;">${acct.parentName || 'VRT Services'}</td>
+                    <td style="padding: 10px 16px; font-weight: 700; color: #67e8f9;">${acct.parentName || CURRENT_PARENT_NAME}</td>
                     <td style="padding: 10px 16px; font-family: monospace; font-weight: 700; color: #22d3ee;">${acct.accountNumber}</td>
                     <td style="padding: 10px 16px; font-weight: 700; color: #fff;">${acct.accountName}</td>
                     <td style="padding: 10px 16px;">
@@ -1897,7 +1949,8 @@
         async function saveCoaRecord(e) {
             e.preventDefault();
             const id = document.getElementById('coaFormId').value;
-            const clientName = document.getElementById('coaClientInput').value.trim();
+            const clientSelect = document.getElementById('coaClientSelect');
+            const clientName = clientSelect ? clientSelect.value.trim() : CURRENT_PARENT_NAME;
             const accountNumber = document.getElementById('coaFormNumber').value.trim();
             const accountName = document.getElementById('coaFormName').value.trim();
             const type = document.getElementById('coaFormType').value;
@@ -1907,7 +1960,7 @@
                 const res = await fetch('/api/clients/coa', {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, clientName, accountNumber, accountName, type })
+                    body: JSON.stringify({ id, clientName, parentName: CURRENT_PARENT_NAME, accountNumber, accountName, type })
                 });
                 if (res.ok) {
                     toggleCoaForm();
@@ -1939,9 +1992,11 @@
         async function handleCoaCsvUpload(input) {
             const file = input.files?.[0];
             if (!file) return;
-            const clientName = document.getElementById('coaClientInput').value.trim() || 'DEFAULT';
+            const clientSelect = document.getElementById('coaClientSelect');
+            const clientName = clientSelect ? clientSelect.value.trim() : CURRENT_PARENT_NAME;
             const formData = new FormData();
             formData.append('clientName', clientName);
+            formData.append('parentName', CURRENT_PARENT_NAME);
             formData.append('file', file);
 
             try {
@@ -1983,9 +2038,11 @@
             const tbody = document.getElementById('mappingsTableBody');
             if (tbody) tbody.innerHTML = '<tr><td colSpan="3" style="padding: 24px; text-align: center; color: #94a3b8;">Loading mappings...</td></tr>';
             try {
-                const res = await fetch('/api/clients/parent-mappings');
+                const res = await fetch(`/api/clients/parent-mappings?parentName=${encodeURIComponent(CURRENT_PARENT_NAME)}`);
                 const data = await res.json();
-                currentParentMappings = data.mappings || [];
+                currentParentMappings = (data.mappings || []).filter(m =>
+                    (m.parentName || '').trim().toLowerCase() === CURRENT_PARENT_NAME.trim().toLowerCase()
+                );
                 renderMappingsTable();
             } catch (err) {
                 console.error('Error fetching mappings:', err);
@@ -2018,7 +2075,7 @@
 
         async function saveParentMappingRecord(e) {
             e.preventDefault();
-            const parentName = document.getElementById('mapFormParent').value.trim();
+            const parentName = document.getElementById('mapFormParent').value.trim() || CURRENT_PARENT_NAME;
             const clientName = document.getElementById('mapFormClient').value.trim();
             try {
                 const res = await fetch('/api/clients/parent-mappings', {
@@ -2028,7 +2085,8 @@
                 });
                 if (res.ok) {
                     document.getElementById('mapFormClient').value = '';
-                    fetchParentMappings();
+                    await fetchParentMappings();
+                    await syncClientSelectDropdowns();
                 } else {
                     const err = await res.json();
                     alert('Error saving mapping: ' + (err.detail || err.error || 'Failed'));
@@ -2044,7 +2102,8 @@
             try {
                 const res = await fetch(`/api/clients/parent-mappings?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
                 if (res.ok) {
-                    fetchParentMappings();
+                    await fetchParentMappings();
+                    await syncClientSelectDropdowns();
                 } else {
                     alert('Failed to delete mapping.');
                 }
@@ -2054,13 +2113,14 @@
         }
 
         // History Rules Modal
-        function openHistoryModal() {
+        async function openHistoryModal() {
             const modal = document.getElementById('historyModal');
             if (!modal) return;
             modal.style.display = 'flex';
             modal.offsetHeight;
             modal.style.opacity = '1';
             if (modal.children[0]) modal.children[0].style.transform = 'scale(1)';
+            await syncClientSelectDropdowns();
             fetchHistoryRecords();
         }
 
@@ -2087,12 +2147,12 @@
         });
 
         async function fetchHistoryRecords() {
-            const clientInput = document.getElementById('historyClientInput');
-            const clientName = clientInput ? clientInput.value.trim() : '';
+            const clientSelect = document.getElementById('historyClientSelect');
+            const clientName = clientSelect ? clientSelect.value.trim() : CURRENT_PARENT_NAME;
             const tbody = document.getElementById('historyTableBody');
             if (tbody) tbody.innerHTML = '<tr><td colSpan="6" style="padding: 24px; text-align: center; color: #94a3b8;">Loading history rules...</td></tr>';
             try {
-                const res = await fetch(`/api/clients/history?clientName=${encodeURIComponent(clientName)}`);
+                const res = await fetch(`/api/clients/history?clientName=${encodeURIComponent(clientName)}&parentName=${encodeURIComponent(CURRENT_PARENT_NAME)}`);
                 const data = await res.json();
                 currentHistoryRecords = data.historyRules || [];
                 renderHistoryTable();
@@ -2155,7 +2215,7 @@
 
             tbody.innerHTML = filtered.map(rule => `
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 10px 16px; font-weight: 700; color: #6ee7b7;">${rule.parentName || 'VRT Services'}</td>
+                    <td style="padding: 10px 16px; font-weight: 700; color: #6ee7b7;">${rule.parentName || CURRENT_PARENT_NAME}</td>
                     <td style="padding: 10px 16px; font-family: monospace; font-weight: 700; color: #34d399; text-transform: uppercase;">${rule.pattern}</td>
                     <td style="padding: 10px 16px; font-family: monospace; font-weight: 700; color: #22d3ee;">${rule.accountNumber}</td>
                     <td style="padding: 10px 16px; font-weight: 700; color: #fff;">${rule.accountName || '—'}</td>
@@ -2206,7 +2266,8 @@
         async function saveHistoryRecord(e) {
             e.preventDefault();
             const id = document.getElementById('historyFormId').value;
-            const clientName = document.getElementById('historyClientInput').value.trim();
+            const clientSelect = document.getElementById('historyClientSelect');
+            const clientName = clientSelect ? clientSelect.value.trim() : CURRENT_PARENT_NAME;
             const pattern = document.getElementById('historyFormPattern').value.trim();
             const accountNumber = document.getElementById('historyFormNumber').value.trim();
             const accountName = document.getElementById('historyFormName').value.trim();
@@ -2217,7 +2278,7 @@
                 const res = await fetch('/api/clients/history', {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, clientName, pattern, accountNumber, accountName, transactionType })
+                    body: JSON.stringify({ id, clientName, parentName: CURRENT_PARENT_NAME, pattern, accountNumber, accountName, transactionType })
                 });
                 if (res.ok) {
                     toggleHistoryForm();
@@ -2249,9 +2310,11 @@
         async function handleHistoryCsvUpload(input) {
             const file = input.files?.[0];
             if (!file) return;
-            const clientName = document.getElementById('historyClientInput').value.trim() || 'DEFAULT';
+            const clientSelect = document.getElementById('historyClientSelect');
+            const clientName = clientSelect ? clientSelect.value.trim() : CURRENT_PARENT_NAME;
             const formData = new FormData();
             formData.append('clientName', clientName);
+            formData.append('parentName', CURRENT_PARENT_NAME);
             formData.append('file', file);
 
             try {
@@ -2261,7 +2324,7 @@
                     alert(data.message || 'History rules uploaded successfully!');
                     fetchHistoryRecords();
                 } else {
-                    alert('Error uploading History CSV: ' + (data.detail || data.error || 'Failed'));
+                    alert('Error uploading history CSV: ' + (data.detail || data.error || 'Failed'));
                 }
             } catch (err) {
                 alert('Error uploading file: ' + err.message);

@@ -307,16 +307,10 @@ def get_client_user(username: str) -> dict | None:
             conn.close()
 
 def normalize_parent_name(parent_name: str | None) -> str:
-    """
-    Normalizes parent company name.
-    If parent_name is empty/missing or 'Datalazo LLC' / 'Datalazo', map to 'VRT Services'.
-    """
+    """Normalizes parent company name, defaulting to VRT Services if empty."""
     if not parent_name:
         return "VRT Services"
-    p = str(parent_name).strip()
-    if p.lower() in ("datalazo llc", "datalazo"):
-        return "VRT Services"
-    return p
+    return str(parent_name).strip()
 
 def get_user_parent_name(username: str) -> str:
     """Fetch the parent company name for a given user from their Client account, defaulting to VRT Services."""
@@ -1044,6 +1038,8 @@ async def read_index(request: Request, msg: str = "", error: str = ""):
     if qbo_connected:
         qbo_company_name = fetch_qbo_company_name(qbo_token, qbo_realm_id)
 
+    user_parent_name = get_user_parent_name(username) or company_name or "VRT Services"
+
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -1051,6 +1047,7 @@ async def read_index(request: Request, msg: str = "", error: str = ""):
             "client_config": client_conf,
             "username": username,
             "company_name": company_name or "Datalazo Partner",
+            "parent_name": user_parent_name,
             "software_name": software_name or "",
             "qbo_connected": qbo_connected,
             "qbo_realm_id": qbo_realm_id or "",
