@@ -375,6 +375,66 @@
     </div>
 
     <div class="user-bar-right">
+        <button id="openCoaModalBtn" style="
+            font-size: 0.78rem; font-weight: 700;
+            color: #67e8f9;
+            background: rgba(6, 182, 212, 0.15);
+            border: 1px solid rgba(6, 182, 212, 0.35);
+            border-radius: 20px;
+            padding: 6px 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            display: flex; align-items: center; gap: 6px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.15);
+        "
+        title="Chart of Accounts Manager"
+        onmouseover="this.style.color='#fff';this.style.background='rgba(6,182,212,0.35)';this.style.borderColor='#22d3ee';this.style.transform='translateY(-1px)'"
+        onmouseout="this.style.color='#67e8f9';this.style.background='rgba(6,182,212,0.15)';this.style.borderColor='rgba(6, 182, 212, 0.35)';this.style.transform='none'">
+            📊 COA
+        </button>
+
+        <button id="openMappingsModalBtn" style="
+            font-size: 0.78rem; font-weight: 700;
+            color: #c084fc;
+            background: rgba(168, 85, 247, 0.15);
+            border: 1px solid rgba(168, 85, 247, 0.35);
+            border-radius: 20px;
+            padding: 6px 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            display: flex; align-items: center; gap: 6px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.15);
+        "
+        title="Parent-Client Mappings Manager"
+        onmouseover="this.style.color='#fff';this.style.background='rgba(168,85,247,0.35)';this.style.borderColor='#e879f9';this.style.transform='translateY(-1px)'"
+        onmouseout="this.style.color='#c084fc';this.style.background='rgba(168,85,247,0.15)';this.style.borderColor='rgba(168, 85, 247, 0.35)';this.style.transform='none'">
+            🔗 MAPING
+        </button>
+
+        <button id="openHistoryModalBtn" style="
+            font-size: 0.78rem; font-weight: 700;
+            color: #6ee7b7;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            border-radius: 20px;
+            padding: 6px 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            display: flex; align-items: center; gap: 6px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+        "
+        title="Transaction History Rules Manager"
+        onmouseover="this.style.color='#fff';this.style.background='rgba(16,185,129,0.35)';this.style.borderColor='#34d399';this.style.transform='translateY(-1px)'"
+        onmouseout="this.style.color='#6ee7b7';this.style.background='rgba(16,185,129,0.15)';this.style.borderColor='rgba(16, 185, 129, 0.35)';this.style.transform='none'">
+            📜 HISTORY
+        </button>
+
         <button id="supportBtn" style="
             font-size: 0.78rem; font-weight: 600;
             color: var(--text-muted);
@@ -764,6 +824,215 @@
                     background: var(--secondary-grad);
                     box-shadow: 0 4px 15px rgba(0, 242, 254, 0.25);
                 ">Send Email</button>
+    <!-- COA Modal -->
+    <div id="coaModal" class="app-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div style="background: #0b1324; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 20px; max-width: 95%; width: 950px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
+                <div>
+                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; color: #fff;">
+                        📊 Chart of Accounts <span style="color: #22d3ee;">Manager</span>
+                    </h3>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
+                        Parent: <strong style="color: #22d3ee;" id="coaParentNameDisplay">{{ company_name or 'VRT Services' }}</strong> — View, add, edit, delete, or upload Chart of Accounts CSV files.
+                    </p>
+                </div>
+                <button onclick="closeCoaModal()" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Client:</label>
+                    <input type="text" id="coaClientInput" value="{{ company_name or '' }}" placeholder="Client Name" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;" onchange="fetchCoaRecords()">
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <input type="text" id="coaSearchInput" placeholder="Search account code or name..." style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; width: 220px; outline: none;" oninput="renderCoaTable()">
+                    <label style="padding: 6px 14px; background: #0891b2; color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 12px rgba(6, 182, 212, 0.3);">
+                        📁 Upload CSV
+                        <input type="file" id="coaCsvInput" accept=".csv" style="display: none;" onchange="handleCoaCsvUpload(this)">
+                    </label>
+                    <button id="toggleCoaFormBtn" onclick="toggleCoaForm()" style="padding: 6px 14px; background: linear-gradient(135deg, #06b6d4, #2563eb); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border: none; border-radius: 10px; cursor: pointer;">
+                        ➕ Add Account
+                    </button>
+                </div>
+            </div>
+
+            <form id="coaForm" style="display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 12px; padding: 14px; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));" onsubmit="saveCoaRecord(event)">
+                <input type="hidden" id="coaFormId">
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account Number *</label>
+                    <input type="text" id="coaFormNumber" required placeholder="e.g. 6100" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account Name *</label>
+                    <input type="text" id="coaFormName" required placeholder="e.g. Automobile Expenses" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Type</label>
+                    <select id="coaFormType" style="width: 100%; background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                        <option value="Expense">Expense</option>
+                        <option value="Income">Income</option>
+                        <option value="Current Asset">Current Asset</option>
+                        <option value="Fixed Asset">Fixed Asset</option>
+                        <option value="Cost of Goods">Cost of Goods</option>
+                        <option value="Current Liability">Current Liability</option>
+                        <option value="Capital">Capital</option>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button type="submit" id="coaFormSubmitBtn" style="width: 100%; padding: 8px; background: #0891b2; color: #fff; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; border: none; border-radius: 8px; cursor: pointer;">Save Account</button>
+                </div>
+            </form>
+
+            <div style="overflow-y: auto; flex: 1; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
+                    <thead style="position: sticky; top: 0; background: #141722; z-index: 10;">
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">
+                            <th style="padding: 10px 16px;">Parent Name</th>
+                            <th style="padding: 10px 16px;">Account #</th>
+                            <th style="padding: 10px 16px;">Account Name</th>
+                            <th style="padding: 10px 16px;">Type</th>
+                            <th style="padding: 10px 16px; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="coaTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
+                <span style="font-size: 0.75rem; color: #94a3b8;">Total Accounts: <strong id="coaTotalCount" style="color: #fff;">0</strong></span>
+                <button onclick="closeCoaModal()" style="padding: 8px 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer;">Close Manager</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parent-Client Mappings Modal -->
+    <div id="mappingsModal" class="app-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div style="background: #0b1324; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 20px; max-width: 95%; width: 800px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
+                <div>
+                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; color: #fff;">
+                        🔗 Parent-Client <span style="color: #c084fc;">Mappings Manager</span>
+                    </h3>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
+                        Parent: <strong style="color: #c084fc;" id="mappingsParentDisplay">{{ company_name or 'VRT Services' }}</strong> — View and add client names for this company.
+                    </p>
+                </div>
+                <button onclick="closeMappingsModal()" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
+            </div>
+
+            <form style="background: rgba(255,255,255,0.03); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: flex-end;" onsubmit="saveParentMappingRecord(event)">
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Parent / Company Name *</label>
+                    <input type="text" id="mapFormParent" readonly value="{{ company_name or 'VRT Services' }}" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #cbd5e1; opacity: 0.8;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Enter Client Name *</label>
+                    <input type="text" id="mapFormClient" required placeholder="e.g. New Client Name" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                </div>
+                <button type="submit" style="padding: 8px 16px; background: #9333ea; color: #fff; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; border: none; border-radius: 8px; cursor: pointer; white-space: nowrap;">➕ Add Client</button>
+            </form>
+
+            <div style="overflow-y: auto; flex: 1; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
+                    <thead style="position: sticky; top: 0; background: #141722; z-index: 10;">
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">
+                            <th style="padding: 10px 16px;">Parent Name</th>
+                            <th style="padding: 10px 16px;">Associated Client</th>
+                            <th style="padding: 10px 16px; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mappingsTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
+                <span style="font-size: 0.75rem; color: #94a3b8;">Total Mappings: <strong id="mappingsTotalCount" style="color: #fff;">0</strong></span>
+                <button onclick="closeMappingsModal()" style="padding: 8px 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer;">Close Manager</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Rules Modal -->
+    <div id="historyModal" class="app-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div style="background: #0b1324; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; max-width: 95%; width: 950px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
+                <div>
+                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; color: #fff;">
+                        📜 Transaction History <span style="color: #34d399;">Rules Manager</span>
+                    </h3>
+                    <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
+                        Parent: <strong style="color: #34d399;" id="historyParentNameDisplay">{{ company_name or 'VRT Services' }}</strong> — View, add, edit, delete, or upload vendor transaction matching rules.
+                    </p>
+                </div>
+                <button onclick="closeHistoryModal()" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Client:</label>
+                    <input type="text" id="historyClientInput" value="{{ company_name or '' }}" placeholder="Client Name" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;" onchange="fetchHistoryRecords()">
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <input type="text" id="historySearchInput" placeholder="Search vendor pattern or code..." style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; width: 220px; outline: none;" oninput="renderHistoryTable()">
+                    <label style="padding: 6px 14px; background: #059669; color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);">
+                        📁 Upload CSV
+                        <input type="file" id="historyCsvInput" accept=".csv" style="display: none;" onchange="handleHistoryCsvUpload(this)">
+                    </label>
+                    <button id="toggleHistoryFormBtn" onclick="toggleHistoryForm()" style="padding: 6px 14px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border: none; border-radius: 10px; cursor: pointer;">
+                        ➕ Add Rule
+                    </button>
+                </div>
+            </div>
+
+            <form id="historyForm" style="display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 14px; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));" onsubmit="saveHistoryRecord(event)">
+                <input type="hidden" id="historyFormId">
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Vendor Pattern *</label>
+                    <input type="text" id="historyFormPattern" required placeholder="e.g. FPL" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff; text-transform: uppercase;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account Number *</label>
+                    <input type="text" id="historyFormNumber" required placeholder="e.g. 6300" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account Name</label>
+                    <input type="text" id="historyFormName" placeholder="e.g. Utilities" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Tx Type</label>
+                    <select id="historyFormTxType" style="width: 100%; background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                        <option value="ALL">ALL</option>
+                        <option value="DEPOSIT">DEPOSIT</option>
+                        <option value="WITHDRAWAL">WITHDRAWAL</option>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button type="submit" id="historyFormSubmitBtn" style="width: 100%; padding: 8px; background: #059669; color: #fff; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; border: none; border-radius: 8px; cursor: pointer;">Save Rule</button>
+                </div>
+            </form>
+
+            <div style="overflow-y: auto; flex: 1; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
+                    <thead style="position: sticky; top: 0; background: #141722; z-index: 10;">
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; user-select: none;">
+                            <th style="padding: 10px 16px;">Parent Name</th>
+                            <th style="padding: 10px 16px; cursor: pointer;" onclick="handleHistorySort('pattern')">Vendor Pattern <span id="sortPatternArrow">↕</span></th>
+                            <th style="padding: 10px 16px; cursor: pointer;" onclick="handleHistorySort('accountNumber')">Account # <span id="sortAccountArrow">↕</span></th>
+                            <th style="padding: 10px 16px; cursor: pointer;" onclick="handleHistorySort('accountName')">Account Name <span id="sortNameArrow">↕</span></th>
+                            <th style="padding: 10px 16px;">Tx Type</th>
+                            <th style="padding: 10px 16px; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
+                <span style="font-size: 0.75rem; color: #94a3b8;">Total Rules: <strong id="historyTotalCount" style="color: #fff;">0</strong></span>
+                <button onclick="closeHistoryModal()" style="padding: 8px 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer;">Close Manager</button>
             </div>
         </div>
     </div>
@@ -1494,6 +1763,487 @@
                     statusDiv.textContent = 'Auto-test: CSV download failed: ' + err.message;
                 }
             }, 1000);
+        }
+        // --- COA, Parent Mappings, and History Modal Logic ---
+        let currentCoaRecords = [];
+        let currentParentMappings = [];
+        let currentHistoryRecords = [];
+
+        let historySortKey = 'accountNumber';
+        let historySortOrder = 'asc';
+
+        // Modal Triggers
+        const openCoaModalBtn = document.getElementById('openCoaModalBtn');
+        const openMappingsModalBtn = document.getElementById('openMappingsModalBtn');
+        const openHistoryModalBtn = document.getElementById('openHistoryModalBtn');
+
+        if (openCoaModalBtn) {
+            openCoaModalBtn.addEventListener('click', openCoaModal);
+        }
+        if (openMappingsModalBtn) {
+            openMappingsModalBtn.addEventListener('click', openMappingsModal);
+        }
+        if (openHistoryModalBtn) {
+            openHistoryModalBtn.addEventListener('click', openHistoryModal);
+        }
+
+        // COA Modal
+        function openCoaModal() {
+            const modal = document.getElementById('coaModal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            setTimeout(() => { modal.style.opacity = '1'; modal.children[0].style.transform = 'scale(1)'; }, 10);
+            fetchCoaRecords();
+        }
+
+        function closeCoaModal() {
+            const modal = document.getElementById('coaModal');
+            if (!modal) return;
+            modal.style.opacity = '0';
+            modal.children[0].style.transform = 'scale(0.95)';
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+
+        async function fetchCoaRecords() {
+            const clientInput = document.getElementById('coaClientInput');
+            const clientName = clientInput ? clientInput.value.trim() : '';
+            const tbody = document.getElementById('coaTableBody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colSpan="5" style="padding: 24px; text-align: center; color: #94a3b8;">Loading accounts...</td></tr>';
+            }
+            try {
+                const res = await fetch(`/api/clients/coa?clientName=${encodeURIComponent(clientName)}`);
+                const data = await res.json();
+                currentCoaRecords = data.accounts || [];
+                renderCoaTable();
+            } catch (err) {
+                console.error('Error fetching COA:', err);
+                if (tbody) tbody.innerHTML = '<tr><td colSpan="5" style="padding: 24px; text-align: center; color: #ff5252;">Failed to load accounts.</td></tr>';
+            }
+        }
+
+        function renderCoaTable() {
+            const query = (document.getElementById('coaSearchInput')?.value || '').toLowerCase();
+            const tbody = document.getElementById('coaTableBody');
+            const totalCount = document.getElementById('coaTotalCount');
+            if (!tbody) return;
+
+            const filtered = currentCoaRecords.filter(a =>
+                (a.accountNumber || '').toLowerCase().includes(query) ||
+                (a.accountName || '').toLowerCase().includes(query) ||
+                (a.type || '').toLowerCase().includes(query)
+            );
+
+            if (totalCount) totalCount.textContent = filtered.length;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colSpan="5" style="padding: 24px; text-align: center; color: #64748b;">No accounts found. Click ➕ Add Account or Upload CSV.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(acct => `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 10px 16px; font-weight: 700; color: #67e8f9;">${acct.parentName || 'VRT Services'}</td>
+                    <td style="padding: 10px 16px; font-family: monospace; font-weight: 700; color: #22d3ee;">${acct.accountNumber}</td>
+                    <td style="padding: 10px 16px; font-weight: 700; color: #fff;">${acct.accountName}</td>
+                    <td style="padding: 10px 16px;">
+                        <span style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; text-transform: uppercase; font-weight: 700; color: #cbd5e1;">${acct.type || 'Expense'}</span>
+                    </td>
+                    <td style="padding: 10px 16px; text-align: right;">
+                        <button onclick="editCoaRecord('${acct.id || ''}', '${acct.accountNumber.replace(/'/g, "\\'")}', '${acct.accountName.replace(/'/g, "\\'")}', '${(acct.type || 'Expense').replace(/'/g, "\\'")}')" style="padding: 4px 10px; background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3); color: #67e8f9; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; cursor: pointer; margin-right: 6px;">Edit</button>
+                        <button onclick="deleteCoaRecord('${acct.id || ''}')" style="padding: 4px 10px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; cursor: pointer;">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function toggleCoaForm() {
+            const form = document.getElementById('coaForm');
+            const btn = document.getElementById('toggleCoaFormBtn');
+            if (!form) return;
+            if (form.style.display === 'none' || !form.style.display) {
+                document.getElementById('coaFormId').value = '';
+                document.getElementById('coaFormNumber').value = '';
+                document.getElementById('coaFormName').value = '';
+                document.getElementById('coaFormType').value = 'Expense';
+                document.getElementById('coaFormSubmitBtn').textContent = 'Save Account';
+                form.style.display = 'grid';
+                if (btn) btn.textContent = 'Cancel';
+            } else {
+                form.style.display = 'none';
+                if (btn) btn.textContent = '➕ Add Account';
+            }
+        }
+
+        function editCoaRecord(id, number, name, type) {
+            const form = document.getElementById('coaForm');
+            const btn = document.getElementById('toggleCoaFormBtn');
+            if (!form) return;
+            document.getElementById('coaFormId').value = id;
+            document.getElementById('coaFormNumber').value = number;
+            document.getElementById('coaFormName').value = name;
+            document.getElementById('coaFormType').value = type || 'Expense';
+            document.getElementById('coaFormSubmitBtn').textContent = 'Update Account';
+            form.style.display = 'grid';
+            if (btn) btn.textContent = 'Cancel';
+        }
+
+        async function saveCoaRecord(e) {
+            e.preventDefault();
+            const id = document.getElementById('coaFormId').value;
+            const clientName = document.getElementById('coaClientInput').value.trim();
+            const accountNumber = document.getElementById('coaFormNumber').value.trim();
+            const accountName = document.getElementById('coaFormName').value.trim();
+            const type = document.getElementById('coaFormType').value;
+
+            try {
+                const method = id ? 'PUT' : 'POST';
+                const res = await fetch('/api/clients/coa', {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, clientName, accountNumber, accountName, type })
+                });
+                if (res.ok) {
+                    toggleCoaForm();
+                    fetchCoaRecords();
+                } else {
+                    const err = await res.json();
+                    alert('Error saving COA: ' + (err.detail || err.error || 'Failed'));
+                }
+            } catch (err) {
+                alert('Error saving COA: ' + err.message);
+            }
+        }
+
+        async function deleteCoaRecord(id) {
+            if (!id) return;
+            if (!confirm('Are you sure you want to delete this account?')) return;
+            try {
+                const res = await fetch(`/api/clients/coa?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+                if (res.ok) {
+                    fetchCoaRecords();
+                } else {
+                    alert('Failed to delete account.');
+                }
+            } catch (err) {
+                alert('Error deleting account: ' + err.message);
+            }
+        }
+
+        async function handleCoaCsvUpload(input) {
+            const file = input.files?.[0];
+            if (!file) return;
+            const clientName = document.getElementById('coaClientInput').value.trim() || 'DEFAULT';
+            const formData = new FormData();
+            formData.append('clientName', clientName);
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/clients/upload-coa', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message || 'COA uploaded successfully!');
+                    fetchCoaRecords();
+                } else {
+                    alert('Error uploading COA CSV: ' + (data.detail || data.error || 'Failed'));
+                }
+            } catch (err) {
+                alert('Error uploading file: ' + err.message);
+            } finally {
+                input.value = '';
+            }
+        }
+
+        // Parent Mappings Modal
+        function openMappingsModal() {
+            const modal = document.getElementById('mappingsModal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            setTimeout(() => { modal.style.opacity = '1'; modal.children[0].style.transform = 'scale(1)'; }, 10);
+            fetchParentMappings();
+        }
+
+        function closeMappingsModal() {
+            const modal = document.getElementById('mappingsModal');
+            if (!modal) return;
+            modal.style.opacity = '0';
+            modal.children[0].style.transform = 'scale(0.95)';
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+
+        async function fetchParentMappings() {
+            const tbody = document.getElementById('mappingsTableBody');
+            if (tbody) tbody.innerHTML = '<tr><td colSpan="3" style="padding: 24px; text-align: center; color: #94a3b8;">Loading mappings...</td></tr>';
+            try {
+                const res = await fetch('/api/clients/parent-mappings');
+                const data = await res.json();
+                currentParentMappings = data.mappings || [];
+                renderMappingsTable();
+            } catch (err) {
+                console.error('Error fetching mappings:', err);
+                if (tbody) tbody.innerHTML = '<tr><td colSpan="3" style="padding: 24px; text-align: center; color: #ff5252;">Failed to load mappings.</td></tr>';
+            }
+        }
+
+        function renderMappingsTable() {
+            const tbody = document.getElementById('mappingsTableBody');
+            const totalCount = document.getElementById('mappingsTotalCount');
+            if (!tbody) return;
+
+            if (totalCount) totalCount.textContent = currentParentMappings.length;
+
+            if (currentParentMappings.length === 0) {
+                tbody.innerHTML = '<tr><td colSpan="3" style="padding: 24px; text-align: center; color: #64748b;">No client mappings found. Add one using the form above.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = currentParentMappings.map(m => `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 10px 16px; font-weight: 700; color: #c084fc;">${m.parentName}</td>
+                    <td style="padding: 10px 16px; font-weight: 700; color: #fff;">${m.clientName}</td>
+                    <td style="padding: 10px 16px; text-align: right;">
+                        <button onclick="deleteParentMappingRecord('${m.id || ''}')" style="padding: 4px 10px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; cursor: pointer;">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function saveParentMappingRecord(e) {
+            e.preventDefault();
+            const parentName = document.getElementById('mapFormParent').value.trim();
+            const clientName = document.getElementById('mapFormClient').value.trim();
+            try {
+                const res = await fetch('/api/clients/parent-mappings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ parentName, clientName })
+                });
+                if (res.ok) {
+                    document.getElementById('mapFormClient').value = '';
+                    fetchParentMappings();
+                } else {
+                    const err = await res.json();
+                    alert('Error saving mapping: ' + (err.detail || err.error || 'Failed'));
+                }
+            } catch (err) {
+                alert('Error saving mapping: ' + err.message);
+            }
+        }
+
+        async function deleteParentMappingRecord(id) {
+            if (!id) return;
+            if (!confirm('Are you sure you want to delete this mapping?')) return;
+            try {
+                const res = await fetch(`/api/clients/parent-mappings?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+                if (res.ok) {
+                    fetchParentMappings();
+                } else {
+                    alert('Failed to delete mapping.');
+                }
+            } catch (err) {
+                alert('Error deleting mapping: ' + err.message);
+            }
+        }
+
+        // History Rules Modal
+        function openHistoryModal() {
+            const modal = document.getElementById('historyModal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            setTimeout(() => { modal.style.opacity = '1'; modal.children[0].style.transform = 'scale(1)'; }, 10);
+            fetchHistoryRecords();
+        }
+
+        function closeHistoryModal() {
+            const modal = document.getElementById('historyModal');
+            if (!modal) return;
+            modal.style.opacity = '0';
+            modal.children[0].style.transform = 'scale(0.95)';
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+
+        async function fetchHistoryRecords() {
+            const clientInput = document.getElementById('historyClientInput');
+            const clientName = clientInput ? clientInput.value.trim() : '';
+            const tbody = document.getElementById('historyTableBody');
+            if (tbody) tbody.innerHTML = '<tr><td colSpan="6" style="padding: 24px; text-align: center; color: #94a3b8;">Loading history rules...</td></tr>';
+            try {
+                const res = await fetch(`/api/clients/history?clientName=${encodeURIComponent(clientName)}`);
+                const data = await res.json();
+                currentHistoryRecords = data.historyRules || [];
+                renderHistoryTable();
+            } catch (err) {
+                console.error('Error fetching history rules:', err);
+                if (tbody) tbody.innerHTML = '<tr><td colSpan="6" style="padding: 24px; text-align: center; color: #ff5252;">Failed to load history rules.</td></tr>';
+            }
+        }
+
+        function handleHistorySort(key) {
+            if (historySortKey === key) {
+                historySortOrder = historySortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                historySortKey = key;
+                historySortOrder = 'asc';
+            }
+            renderHistoryTable();
+        }
+
+        function renderHistoryTable() {
+            const query = (document.getElementById('historySearchInput')?.value || '').toLowerCase();
+            const tbody = document.getElementById('historyTableBody');
+            const totalCount = document.getElementById('historyTotalCount');
+            if (!tbody) return;
+
+            let filtered = currentHistoryRecords.filter(r =>
+                (r.pattern || '').toLowerCase().includes(query) ||
+                (r.accountNumber || '').toLowerCase().includes(query) ||
+                (r.accountName || '').toLowerCase().includes(query)
+            );
+
+            if (historySortKey) {
+                filtered.sort((a, b) => {
+                    const valA = (a[historySortKey] || '').toString();
+                    const valB = (b[historySortKey] || '').toString();
+                    let cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+                    return historySortOrder === 'asc' ? cmp : -cmp;
+                });
+            }
+
+            if (totalCount) totalCount.textContent = filtered.length;
+
+            // Update arrows
+            ['Pattern', 'Account', 'Name'].forEach(col => {
+                const el = document.getElementById(`sort${col}Arrow`);
+                if (el) el.textContent = '↕';
+            });
+            if (historySortKey === 'pattern' && document.getElementById('sortPatternArrow')) {
+                document.getElementById('sortPatternArrow').textContent = historySortOrder === 'asc' ? '▲' : '▼';
+            } else if (historySortKey === 'accountNumber' && document.getElementById('sortAccountArrow')) {
+                document.getElementById('sortAccountArrow').textContent = historySortOrder === 'asc' ? '▲' : '▼';
+            } else if (historySortKey === 'accountName' && document.getElementById('sortNameArrow')) {
+                document.getElementById('sortNameArrow').textContent = historySortOrder === 'asc' ? '▲' : '▼';
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colSpan="6" style="padding: 24px; text-align: center; color: #64748b;">No transaction rules found. Click ➕ Add Rule or Upload CSV.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(rule => `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 10px 16px; font-weight: 700; color: #6ee7b7;">${rule.parentName || 'VRT Services'}</td>
+                    <td style="padding: 10px 16px; font-family: monospace; font-weight: 700; color: #34d399; text-transform: uppercase;">${rule.pattern}</td>
+                    <td style="padding: 10px 16px; font-family: monospace; font-weight: 700; color: #22d3ee;">${rule.accountNumber}</td>
+                    <td style="padding: 10px 16px; font-weight: 700; color: #fff;">${rule.accountName || '—'}</td>
+                    <td style="padding: 10px 16px;">
+                        <span style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; text-transform: uppercase; font-weight: 700; color: #cbd5e1;">${rule.transactionType || 'ALL'}</span>
+                    </td>
+                    <td style="padding: 10px 16px; text-align: right;">
+                        <button onclick="editHistoryRecord('${rule.id || ''}', '${rule.pattern.replace(/'/g, "\\'")}', '${rule.accountNumber.replace(/'/g, "\\'")}', '${(rule.accountName || '').replace(/'/g, "\\'")}', '${(rule.transactionType || 'ALL').replace(/'/g, "\\'")}')" style="padding: 4px 10px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; cursor: pointer; margin-right: 6px;">Edit</button>
+                        <button onclick="deleteHistoryRecord('${rule.id || ''}')" style="padding: 4px 10px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; cursor: pointer;">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function toggleHistoryForm() {
+            const form = document.getElementById('historyForm');
+            const btn = document.getElementById('toggleHistoryFormBtn');
+            if (!form) return;
+            if (form.style.display === 'none' || !form.style.display) {
+                document.getElementById('historyFormId').value = '';
+                document.getElementById('historyFormPattern').value = '';
+                document.getElementById('historyFormNumber').value = '';
+                document.getElementById('historyFormName').value = '';
+                document.getElementById('historyFormTxType').value = 'ALL';
+                document.getElementById('historyFormSubmitBtn').textContent = 'Save Rule';
+                form.style.display = 'grid';
+                if (btn) btn.textContent = 'Cancel';
+            } else {
+                form.style.display = 'none';
+                if (btn) btn.textContent = '➕ Add Rule';
+            }
+        }
+
+        function editHistoryRecord(id, pattern, number, name, txType) {
+            const form = document.getElementById('historyForm');
+            const btn = document.getElementById('toggleHistoryFormBtn');
+            if (!form) return;
+            document.getElementById('historyFormId').value = id;
+            document.getElementById('historyFormPattern').value = pattern;
+            document.getElementById('historyFormNumber').value = number;
+            document.getElementById('historyFormName').value = name || '';
+            document.getElementById('historyFormTxType').value = txType || 'ALL';
+            document.getElementById('historyFormSubmitBtn').textContent = 'Update Rule';
+            form.style.display = 'grid';
+            if (btn) btn.textContent = 'Cancel';
+        }
+
+        async function saveHistoryRecord(e) {
+            e.preventDefault();
+            const id = document.getElementById('historyFormId').value;
+            const clientName = document.getElementById('historyClientInput').value.trim();
+            const pattern = document.getElementById('historyFormPattern').value.trim();
+            const accountNumber = document.getElementById('historyFormNumber').value.trim();
+            const accountName = document.getElementById('historyFormName').value.trim();
+            const transactionType = document.getElementById('historyFormTxType').value;
+
+            try {
+                const method = id ? 'PUT' : 'POST';
+                const res = await fetch('/api/clients/history', {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, clientName, pattern, accountNumber, accountName, transactionType })
+                });
+                if (res.ok) {
+                    toggleHistoryForm();
+                    fetchHistoryRecords();
+                } else {
+                    const err = await res.json();
+                    alert('Error saving history rule: ' + (err.detail || err.error || 'Failed'));
+                }
+            } catch (err) {
+                alert('Error saving history rule: ' + err.message);
+            }
+        }
+
+        async function deleteHistoryRecord(id) {
+            if (!id) return;
+            if (!confirm('Are you sure you want to delete this rule?')) return;
+            try {
+                const res = await fetch(`/api/clients/history?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+                if (res.ok) {
+                    fetchHistoryRecords();
+                } else {
+                    alert('Failed to delete rule.');
+                }
+            } catch (err) {
+                alert('Error deleting rule: ' + err.message);
+            }
+        }
+
+        async function handleHistoryCsvUpload(input) {
+            const file = input.files?.[0];
+            if (!file) return;
+            const clientName = document.getElementById('historyClientInput').value.trim() || 'DEFAULT';
+            const formData = new FormData();
+            formData.append('clientName', clientName);
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/clients/upload-history', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message || 'History rules uploaded successfully!');
+                    fetchHistoryRecords();
+                } else {
+                    alert('Error uploading History CSV: ' + (data.detail || data.error || 'Failed'));
+                }
+            } catch (err) {
+                alert('Error uploading file: ' + err.message);
+            } finally {
+                input.value = '';
+            }
         }
     </script>
 </body>

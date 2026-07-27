@@ -1334,6 +1334,412 @@ async def get_coa_endpoint(request: Request, client_name: str = "Toirak's Group 
     coa_list = get_client_coa(client_name, resolved_parent)
     return {"success": True, "client_name": client_name, "parent_name": resolved_parent, "coa": coa_list}
 
+@app.get("/api/clients/coa")
+async def get_clients_coa_endpoint(request: Request, clientName: str = "", parentName: str = ""):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    resolved_parent = parentName or get_user_parent_name(username)
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            query = 'SELECT id, "clientName", "parentName", "accountNumber", "accountName", "type", "subType", "level" FROM "ClientChartOfAccounts"'
+            conditions = []
+            params = []
+            if clientName:
+                conditions.append('LOWER("clientName") = LOWER(%s)')
+                params.append(clientName)
+            if resolved_parent:
+                conditions.append('LOWER("parentName") = LOWER(%s)')
+                params.append(resolved_parent)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            query += ' ORDER BY "accountNumber" ASC;'
+            cur.execute(query, params)
+            accounts = cur.fetchall() or []
+            return {"success": True, "accounts": accounts}
+    except Exception as e:
+        print(f"Error fetching COA: {e}")
+        return {"success": False, "error": str(e), "accounts": []}
+    finally:
+        if conn: conn.close()
+
+@app.post("/api/clients/coa")
+@app.put("/api/clients/coa")
+async def save_client_coa_endpoint(request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    body = await request.json()
+    record_id = body.get("id")
+    client_name = body.get("clientName") or "DEFAULT"
+    parent_name = body.get("parentName") or get_user_parent_name(username)
+    account_number = body.get("accountNumber") or ""
+    account_name = body.get("accountName") or ""
+    acct_type = body.get("type") or "Expense"
+    sub_type = body.get("subType") or ""
+    level = int(body.get("level") or 0)
+
+    if not account_number or not account_name:
+        raise HTTPException(status_code=400, detail="accountNumber and accountName are required.")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if record_id:
+                cur.execute('''
+                    UPDATE "ClientChartOfAccounts"
+                    SET "parentName" = %s, "accountNumber" = %s, "accountName" = %s, "type" = %s, "subType" = %s, "level" = %s, "updatedAt" = CURRENT_TIMESTAMP
+                    WHERE "id" = %s
+                    RETURNING *;
+                ''', (parent_name, account_number, account_name, acct_type, sub_type, level, record_id))
+            else:
+                import uuid
+                new_id = str(uuid.uuid4())
+                cur.execute('''
+                    INSERT INTO "ClientChartOfAccounts" ("id", "clientName", "parentName", "accountNumber", "accountName", "type", "subType", "level", "createdAt", "updatedAt")
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT ("clientName", "accountNumber")
+                    DO UPDATE SET "parentName" = EXCLUDED."parentName", "accountName" = EXCLUDED."accountName", "type" = EXCLUDED."type", "subType" = EXCLUDED."subType", "level" = EXCLUDED."level", "updatedAt" = CURRENT_TIMESTAMP
+                    RETURNING *;
+                ''', (new_id, client_name, parent_name, account_number, account_name, acct_type, sub_type, level))
+            account = cur.fetchone()
+            conn.commit()
+            return {"success": True, "account": account}
+    except Exception as e:
+        print(f"Error saving COA record: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+@app.delete("/api/clients/coa")
+async def delete_client_coa_endpoint(request: Request, id: str = ""):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    if not id:
+        raise HTTPException(status_code=400, detail="ID is required.")
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute('DELETE FROM "ClientChartOfAccounts" WHERE "id" = %s;', (id,))
+            conn.commit()
+            return {"success": True, "message": "Account deleted"}
+    except Exception as e:
+        print(f"Error deleting COA: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+@app.post("/api/clients/upload-coa")
+async def upload_client_coa_endpoint(request: Request, clientName: str = Form(...), parentName: str = Form("VRT Services"), file: UploadFile = File(...)):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    content = await file.read()
+    text = content.decode("utf-8-sig", errors="ignore")
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    if len(lines) < 2:
+        raise HTTPException(status_code=400, detail="CSV file is empty or missing headers.")
+    headers = [h.strip().replace('"', '') for h in lines[0].split(',')]
+    
+    import re
+    acct_num_idx = next((i for i, h in enumerate(headers) if re.search(r'account\s*number|acct\s*no|code|number', h, re.I)), -1)
+    acct_name_idx = next((i for i, h in enumerate(headers) if re.search(r'account\s*name|name|description', h, re.I)), -1)
+    type_idx = next((i for i, h in enumerate(headers) if re.search(r'type', h, re.I)), -1)
+    sub_type_idx = next((i for i, h in enumerate(headers) if re.search(r'subtype', h, re.I)), -1)
+    level_idx = next((i for i, h in enumerate(headers) if re.search(r'level', h, re.I)), -1)
+    parent_idx = next((i for i, h in enumerate(headers) if re.search(r'parent', h, re.I)), -1)
+
+    if acct_num_idx == -1 or acct_name_idx == -1:
+        raise HTTPException(status_code=400, detail='CSV must contain "Account Number" and "Account Name" columns.')
+
+    import csv, uuid
+    reader = csv.reader(lines[1:])
+    conn = get_db_connection()
+    count = 0
+    try:
+        with conn.cursor() as cur:
+            for row in reader:
+                if not row or len(row) <= max(acct_num_idx, acct_name_idx):
+                    continue
+                acct_num = row[acct_num_idx].strip()
+                acct_name = row[acct_name_idx].strip()
+                if not acct_num or not acct_name:
+                    continue
+                acct_type = row[type_idx].strip() if type_idx != -1 and type_idx < len(row) else "Expense"
+                sub_type = row[sub_type_idx].strip() if sub_type_idx != -1 and sub_type_idx < len(row) else ""
+                level_val = int(row[level_idx].strip()) if level_idx != -1 and level_idx < len(row) and row[level_idx].strip().isdigit() else 0
+                parent_val = row[parent_idx].strip() if parent_idx != -1 and parent_idx < len(row) and row[parent_idx].strip() else parentName
+                
+                new_id = str(uuid.uuid4())
+                cur.execute('''
+                    INSERT INTO "ClientChartOfAccounts" ("id", "clientName", "parentName", "accountNumber", "accountName", "type", "subType", "level", "createdAt", "updatedAt")
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT ("clientName", "accountNumber")
+                    DO UPDATE SET "parentName" = EXCLUDED."parentName", "accountName" = EXCLUDED."accountName", "type" = EXCLUDED."type", "subType" = EXCLUDED."subType", "level" = EXCLUDED."level", "updatedAt" = CURRENT_TIMESTAMP;
+                ''', (new_id, clientName, parent_val, acct_num, acct_name, acct_type, sub_type, level_val))
+                count += 1
+            conn.commit()
+            return {"success": True, "message": f"Successfully imported {count} accounts."}
+    except Exception as e:
+        print(f"Error uploading COA CSV: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.get("/api/clients/parent-mappings")
+async def get_parent_mappings_endpoint(request: Request, parentName: str = ""):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    resolved_parent = parentName or get_user_parent_name(username)
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            query = 'SELECT id, "parentName", "clientName" FROM "ParentClientMap"'
+            params = []
+            if resolved_parent:
+                query += ' WHERE LOWER("parentName") = LOWER(%s)'
+                params.append(resolved_parent)
+            query += ' ORDER BY "parentName" ASC, "clientName" ASC;'
+            cur.execute(query, params)
+            mappings = cur.fetchall() or []
+            return {"success": True, "mappings": mappings}
+    except Exception as e:
+        print(f"Error fetching parent mappings: {e}")
+        return {"success": False, "error": str(e), "mappings": []}
+    finally:
+        if conn: conn.close()
+
+@app.post("/api/clients/parent-mappings")
+async def save_parent_mapping_endpoint(request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    body = await request.json()
+    parent_name = (body.get("parentName") or get_user_parent_name(username)).strip()
+    client_name = (body.get("clientName") or "").strip()
+    if not parent_name or not client_name:
+        raise HTTPException(status_code=400, detail="parentName and clientName are required.")
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            import uuid
+            new_id = str(uuid.uuid4())
+            cur.execute('''
+                INSERT INTO "ParentClientMap" ("id", "parentName", "clientName", "createdAt", "updatedAt")
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT ("parentName", "clientName")
+                DO UPDATE SET "updatedAt" = CURRENT_TIMESTAMP
+                RETURNING *;
+            ''', (new_id, parent_name, client_name))
+            mapping = cur.fetchone()
+            conn.commit()
+            return {"success": True, "mapping": mapping}
+    except Exception as e:
+        print(f"Error saving parent mapping: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+@app.delete("/api/clients/parent-mappings")
+async def delete_parent_mapping_endpoint(request: Request, id: str = ""):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    if not id:
+        raise HTTPException(status_code=400, detail="ID is required.")
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute('DELETE FROM "ParentClientMap" WHERE "id" = %s;', (id,))
+            conn.commit()
+            return {"success": True, "message": "Mapping deleted"}
+    except Exception as e:
+        print(f"Error deleting parent mapping: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+@app.get("/api/clients/history")
+async def get_history_rules_endpoint(request: Request, clientName: str = "", parentName: str = ""):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    resolved_parent = parentName or get_user_parent_name(username)
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            query = 'SELECT id, "clientName", "parentName", "pattern", "accountNumber", "accountName", "transactionType", "source", "useCount" FROM "ClientTransactionHistory"'
+            conditions = []
+            params = []
+            if clientName:
+                conditions.append('LOWER("clientName") = LOWER(%s)')
+                params.append(clientName)
+            if resolved_parent:
+                conditions.append('LOWER("parentName") = LOWER(%s)')
+                params.append(resolved_parent)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            query += ' ORDER BY "updatedAt" DESC;'
+            cur.execute(query, params)
+            historyRules = cur.fetchall() or []
+            return {"success": True, "historyRules": historyRules}
+    except Exception as e:
+        print(f"Error fetching history rules: {e}")
+        return {"success": False, "error": str(e), "historyRules": []}
+    finally:
+        if conn: conn.close()
+
+@app.post("/api/clients/history")
+@app.put("/api/clients/history")
+async def save_history_rule_endpoint(request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    body = await request.json()
+    record_id = body.get("id")
+    client_name = body.get("clientName") or "DEFAULT"
+    parent_name = body.get("parentName") or get_user_parent_name(username)
+    pattern = (body.get("pattern") or "").upper().strip()
+    account_number = (body.get("accountNumber") or "").strip()
+    account_name = (body.get("accountName") or "").strip()
+    tx_type = (body.get("transactionType") or "ALL").upper().strip()
+
+    if not pattern or not account_number:
+        raise HTTPException(status_code=400, detail="pattern and accountNumber are required.")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if record_id:
+                cur.execute('''
+                    UPDATE "ClientTransactionHistory"
+                    SET "parentName" = %s, "pattern" = %s, "accountNumber" = %s, "accountName" = %s, "transactionType" = %s, "source" = 'MANUAL_EDIT', "updatedAt" = CURRENT_TIMESTAMP
+                    WHERE "id" = %s
+                    RETURNING *;
+                ''', (parent_name, pattern, account_number, account_name, tx_type, record_id))
+            else:
+                import uuid
+                new_id = str(uuid.uuid4())
+                cur.execute('''
+                    INSERT INTO "ClientTransactionHistory" ("id", "clientName", "parentName", "pattern", "accountNumber", "accountName", "transactionType", "source", "useCount", "createdAt", "updatedAt")
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'MANUAL_EDIT', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT ("clientName", "pattern", "transactionType")
+                    DO UPDATE SET "parentName" = EXCLUDED."parentName", "accountNumber" = EXCLUDED."accountNumber", "accountName" = EXCLUDED."accountName", "source" = 'MANUAL_EDIT', "updatedAt" = CURRENT_TIMESTAMP
+                    RETURNING *;
+                ''', (new_id, client_name, parent_name, pattern, account_number, account_name, tx_type))
+            rule = cur.fetchone()
+            conn.commit()
+            return {"success": True, "rule": rule}
+    except Exception as e:
+        print(f"Error saving history rule: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+@app.delete("/api/clients/history")
+async def delete_history_rule_endpoint(request: Request, id: str = ""):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    if not id:
+        raise HTTPException(status_code=400, detail="ID is required.")
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute('DELETE FROM "ClientTransactionHistory" WHERE "id" = %s;', (id,))
+            conn.commit()
+            return {"success": True, "message": "Rule deleted"}
+    except Exception as e:
+        print(f"Error deleting history rule: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+@app.post("/api/clients/upload-history")
+async def upload_history_rules_endpoint(request: Request, clientName: str = Form(...), parentName: str = Form("VRT Services"), file: UploadFile = File(...)):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    content = await file.read()
+    text = content.decode("utf-8-sig", errors="ignore")
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    if len(lines) < 2:
+        raise HTTPException(status_code=400, detail="CSV file is empty or missing headers.")
+    headers = [h.strip().replace('"', '') for h in lines[0].split(',')]
+    
+    import re
+    pattern_idx = next((i for i, h in enumerate(headers) if re.search(r'pattern|description|vendor|keyword', h, re.I)), -1)
+    acct_num_idx = next((i for i, h in enumerate(headers) if re.search(r'account\s*number|acct|gl|code', h, re.I)), -1)
+    acct_name_idx = next((i for i, h in enumerate(headers) if re.search(r'account\s*name|category|drake', h, re.I)), -1)
+    tx_type_idx = next((i for i, h in enumerate(headers) if re.search(r'type|transaction\s*type', h, re.I)), -1)
+    parent_idx = next((i for i, h in enumerate(headers) if re.search(r'parent', h, re.I)), -1)
+
+    if pattern_idx == -1 or acct_num_idx == -1:
+        raise HTTPException(status_code=400, detail='CSV must contain "Description"/"Pattern" and "Account Number" columns.')
+
+    import csv, uuid
+    def clean_raw_desc(desc):
+        if not desc: return ""
+        t = desc.upper().strip()
+        t = re.sub(r'\b\d{1,2}[/\-]\d{1,2}(?:[/\-]\d{2,4})?\b', ' ', t)
+        t = re.sub(r'\bCard\s*\d+\b', ' ', t, flags=re.I)
+        t = re.sub(r'\b[A-Z0-9]{12,}\b', ' ', t)
+        t = re.sub(r'X{3,}\d*', ' ', t)
+        t = re.sub(r'#\s*\d+', ' ', t)
+        t = re.sub(r'\b\d{3}[-\s]\d{3}[-\s]\d{4}\b', ' ', t)
+        t = re.sub(r'\b(?:STORE|ST|NO|UNIT)\s*#?\d+\b', ' ', t, flags=re.I)
+        fillers = [r'\bPURCHASE AUTHORIZED ON\b', r'\bPURCHASE RETURN AUTHORIZED ON\b', r'\bRECURRING PAYMENT AUTHORIZED ON\b', r'\bBUSINESS TO BUSINESS ACH DEBIT\b', r'\bPURCHASE AUTHORIZED\b', r'\bPURCHASE\b', r'\bCHECKCARD\b', r'\bDEPOSIT\b', r'\bWITHDRAWAL\b', r'\bPAYMENT\b', r'\bEPAYR\b', r'\bDEBITPMT\b', r'\bDES:\b', r'\bID:\b']
+        for f in fillers:
+            t = re.sub(f, ' ', t, flags=re.I)
+        t = re.sub(r'[^A-Z0-9\s&\.\-]', ' ', t)
+        t = re.sub(r'\s+', ' ', t).strip()
+        return t or desc.upper().strip()
+
+    reader = csv.reader(lines[1:])
+    conn = get_db_connection()
+    count = 0
+    try:
+        with conn.cursor() as cur:
+            for row in reader:
+                if not row or len(row) <= max(pattern_idx, acct_num_idx):
+                    continue
+                raw_pattern = row[pattern_idx].strip()
+                acct_num = row[acct_num_idx].strip()
+                if not raw_pattern or not acct_num:
+                    continue
+                cleaned_pattern = clean_raw_desc(raw_pattern)
+                acct_name = row[acct_name_idx].strip() if acct_name_idx != -1 and acct_name_idx < len(row) else ""
+                tx_type = row[tx_type_idx].strip().upper() if tx_type_idx != -1 and tx_type_idx < len(row) and row[tx_type_idx].strip() else "ALL"
+                parent_val = row[parent_idx].strip() if parent_idx != -1 and parent_idx < len(row) and row[parent_idx].strip() else parentName
+
+                new_id = str(uuid.uuid4())
+                cur.execute('''
+                    INSERT INTO "ClientTransactionHistory" ("id", "clientName", "parentName", "pattern", "accountNumber", "accountName", "transactionType", "source", "useCount", "createdAt", "updatedAt")
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'CSV_UPLOAD', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT ("clientName", "pattern", "transactionType")
+                    DO UPDATE SET "parentName" = EXCLUDED."parentName", "accountNumber" = EXCLUDED."accountNumber", "accountName" = EXCLUDED."accountName", "source" = 'CSV_UPLOAD', "updatedAt" = CURRENT_TIMESTAMP;
+                ''', (new_id, clientName, parent_val, cleaned_pattern, acct_num, acct_name, tx_type))
+                count += 1
+            conn.commit()
+            return {"success": True, "message": f"Successfully imported {count} history rules."}
+    except Exception as e:
+        print(f"Error uploading History CSV: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
 @app.post("/api/history/learn")
 async def learn_history_rule_endpoint(request: Request):
     username = get_current_username(request)
