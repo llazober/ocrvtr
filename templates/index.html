@@ -824,6 +824,10 @@
                     background: var(--secondary-grad);
                     box-shadow: 0 4px 15px rgba(0, 242, 254, 0.25);
                 ">Send Email</button>
+            </div>
+        </div>
+    </div>
+
     <!-- COA Modal -->
     <div id="coaModal" class="app-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
         <div style="background: #0b1324; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 20px; max-width: 95%; width: 950px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
@@ -1792,7 +1796,9 @@
             const modal = document.getElementById('coaModal');
             if (!modal) return;
             modal.style.display = 'flex';
-            setTimeout(() => { modal.style.opacity = '1'; modal.children[0].style.transform = 'scale(1)'; }, 10);
+            modal.offsetHeight;
+            modal.style.opacity = '1';
+            if (modal.children[0]) modal.children[0].style.transform = 'scale(1)';
             fetchCoaRecords();
         }
 
@@ -1800,7 +1806,7 @@
             const modal = document.getElementById('coaModal');
             if (!modal) return;
             modal.style.opacity = '0';
-            modal.children[0].style.transform = 'scale(0.95)';
+            if (modal.children[0]) modal.children[0].style.transform = 'scale(0.95)';
             setTimeout(() => { modal.style.display = 'none'; }, 300);
         }
 
@@ -1959,7 +1965,9 @@
             const modal = document.getElementById('mappingsModal');
             if (!modal) return;
             modal.style.display = 'flex';
-            setTimeout(() => { modal.style.opacity = '1'; modal.children[0].style.transform = 'scale(1)'; }, 10);
+            modal.offsetHeight;
+            modal.style.opacity = '1';
+            if (modal.children[0]) modal.children[0].style.transform = 'scale(1)';
             fetchParentMappings();
         }
 
@@ -1967,7 +1975,7 @@
             const modal = document.getElementById('mappingsModal');
             if (!modal) return;
             modal.style.opacity = '0';
-            modal.children[0].style.transform = 'scale(0.95)';
+            if (modal.children[0]) modal.children[0].style.transform = 'scale(0.95)';
             setTimeout(() => { modal.style.display = 'none'; }, 300);
         }
 
@@ -2050,7 +2058,9 @@
             const modal = document.getElementById('historyModal');
             if (!modal) return;
             modal.style.display = 'flex';
-            setTimeout(() => { modal.style.opacity = '1'; modal.children[0].style.transform = 'scale(1)'; }, 10);
+            modal.offsetHeight;
+            modal.style.opacity = '1';
+            if (modal.children[0]) modal.children[0].style.transform = 'scale(1)';
             fetchHistoryRecords();
         }
 
@@ -2058,9 +2068,23 @@
             const modal = document.getElementById('historyModal');
             if (!modal) return;
             modal.style.opacity = '0';
-            modal.children[0].style.transform = 'scale(0.95)';
+            if (modal.children[0]) modal.children[0].style.transform = 'scale(0.95)';
             setTimeout(() => { modal.style.display = 'none'; }, 300);
         }
+
+        // Close modals when clicking backdrop
+        ['coaModal', 'mappingsModal', 'historyModal'].forEach(id => {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        if (id === 'coaModal') closeCoaModal();
+                        if (id === 'mappingsModal') closeMappingsModal();
+                        if (id === 'historyModal') closeHistoryModal();
+                    }
+                });
+            }
+        });
 
         async function fetchHistoryRecords() {
             const clientInput = document.getElementById('historyClientInput');
