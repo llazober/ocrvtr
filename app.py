@@ -298,7 +298,41 @@ def get_client_user(username: str) -> dict | None:
         conn = get_db_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute('SELECT * FROM "ClientUser" WHERE username = %s;', (username,))
-            return cur.fetchone()
+            user = cur.fetchone()
+            if not user:
+                return None
+            
+            # Check if monthly usage needs to be reset for a new month
+            last_updated = user.get("updatedAt")
+            import datetime
+            now = datetime.datetime.now(datetime.timezone.utc)
+            
+            is_new_month = False
+            months_diff = 0
+            if last_updated:
+                now_compare = now.replace(tzinfo=None) if last_updated.tzinfo is None else now
+                months_diff = (now_compare.year - last_updated.year) * 12 + (now_compare.month - last_updated.month)
+                if months_diff > 0:
+                    is_new_month = True
+            else:
+                is_new_month = True
+                months_diff = 1
+                
+            if is_new_month:
+                actual = user.get("monthlyUsageActual", 0) or 0
+                new_prev = actual if months_diff == 1 else 0
+                new_actual = 0
+                cur.execute(
+                    'UPDATE "ClientUser" SET "monthlyUsageActual" = %s, "monthlyUsagePrevious" = %s, "updatedAt" = %s WHERE id = %s;',
+                    (new_actual, new_prev, now, user["id"])
+                )
+                conn.commit()
+                user["monthlyUsageActual"] = new_actual
+                user["monthlyUsagePrevious"] = new_prev
+                user["updatedAt"] = now
+                print(f"[USAGE AUTO-RESET] User '{username}' logged in/queried in new month (gap: {months_diff}m). Reset actual to 0, previous to {new_prev}.")
+
+            return user
     except Exception as e:
         print(f"Database error fetching user: {e}")
         return None
@@ -514,8 +548,9 @@ def record_user_usage(username: str, page_count: int):
             import datetime
             now = datetime.datetime.now(datetime.timezone.utc)
             
-            # Determine if a new month has started
+            # Determine if a new month has started and calculate month gap
             is_new_month = False
+            months_diff = 0
             if last_updated:
                 # Remove timezone for database timestamps without time zone
                 if last_updated.tzinfo is None:
@@ -523,13 +558,17 @@ def record_user_usage(username: str, page_count: int):
                 else:
                     now_compare = now
                 
-                if (now_compare.year != last_updated.year) or (now_compare.month != last_updated.month):
+                months_diff = (now_compare.year - last_updated.year) * 12 + (now_compare.month - last_updated.month)
+                if months_diff > 0:
                     is_new_month = True
             else:
                 is_new_month = True
+                months_diff = 1
                 
             if is_new_month:
-                new_prev = actual
+                # If gap is exactly 1 month, move actual -> previous.
+                # If gap is > 1 month (e.g. inactive for a full calendar month), previous month had 0 usage.
+                new_prev = actual if months_diff == 1 else 0
                 new_actual = page_count
             else:
                 new_prev = prev
