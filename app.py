@@ -1870,20 +1870,21 @@ async def process_check_pdf(
     if not allowed:
         raise HTTPException(status_code=403, detail=f"Access denied: Your account is assigned to '{assigned_site}'.")
 
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+    ext = os.path.splitext(file.filename.lower())[1]
+    if ext not in [".pdf", ".png", ".jpg", ".jpeg"]:
+        raise HTTPException(status_code=400, detail="Only PDF and image files (.png, .jpg, .jpeg) are supported.")
 
     temp_dir = tempfile.mkdtemp()
-    pdf_path = os.path.join(temp_dir, "input_check.pdf")
+    check_file_path = os.path.join(temp_dir, f"input_check{ext}")
     try:
-        with open(pdf_path, "wb") as f:
+        with open(check_file_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
     except Exception as e:
         cleanup_temp_dir(temp_dir)
         raise HTTPException(status_code=500, detail=f"Failed to save uploaded check file: {e}")
 
     try:
-        check_data = extract_check_images(pdf_path, temp_dir)
+        check_data = extract_check_images(check_file_path, temp_dir)
         background_tasks.add_task(cleanup_temp_dir, temp_dir)
         return check_data
     except Exception as e:

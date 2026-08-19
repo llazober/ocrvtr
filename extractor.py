@@ -1788,8 +1788,12 @@ def group_words_to_lines(words, y_tol=10):
         result.append((avg_y, sorted_line))
     return sorted(result, key=lambda x: x[0])
 
-def extract_check_images(pdf_path, temp_dir):
-    png_paths = convert_pdf_to_png(pdf_path, temp_dir)
+def extract_check_images(file_path, temp_dir):
+    ext = os.path.splitext(file_path.lower())[1]
+    if ext in ['.png', '.jpg', '.jpeg']:
+        png_paths = [file_path]
+    else:
+        png_paths = convert_pdf_to_png(file_path, temp_dir)
     client = get_vision_client()
 
     extracted_checks = []

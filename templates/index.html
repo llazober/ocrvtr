@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bank Statement OCR Extractor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
-    
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+
     <style>
         :root {
             --bg-color: #0b0c10;
@@ -31,7 +34,7 @@
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: var(--bg-color);
-            background-image: 
+            background-image:
                 radial-gradient(circle at 10% 20%, rgba(127, 0, 255, 0.05) 0%, transparent 40%),
                 radial-gradient(circle at 90% 80%, rgba(0, 242, 254, 0.05) 0%, transparent 40%);
             color: var(--text-main);
@@ -80,8 +83,8 @@
             border: 1px solid var(--border-color);
             border-radius: 24px;
             padding: 40px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 
-                        0 0 50px rgba(127, 0, 255, 0.03);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3),
+                0 0 50px rgba(127, 0, 255, 0.03);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             position: relative;
         }
@@ -109,7 +112,8 @@
             overflow: hidden;
         }
 
-        .drop-zone:hover, .drop-zone.drag-over {
+        .drop-zone:hover,
+        .drop-zone.drag-over {
             border-color: #e100ff;
             background: rgba(127, 0, 255, 0.03);
             box-shadow: inset 0 0 20px rgba(127, 0, 255, 0.05);
@@ -132,7 +136,8 @@
             transition: all 0.3s ease;
         }
 
-        .drop-zone:hover .icon-container, .drop-zone.drag-over .icon-container {
+        .drop-zone:hover .icon-container,
+        .drop-zone.drag-over .icon-container {
             background: var(--primary-grad);
             box-shadow: 0 0 20px rgba(225, 0, 255, 0.35);
             transform: translateY(-5px);
@@ -148,7 +153,8 @@
             transition: stroke 0.3s ease;
         }
 
-        .drop-zone:hover .icon-container svg, .drop-zone.drag-over .icon-container svg {
+        .drop-zone:hover .icon-container svg,
+        .drop-zone.drag-over .icon-container svg {
             stroke: #fff;
         }
 
@@ -181,8 +187,15 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .file-details {
@@ -193,7 +206,8 @@
 
         .file-icon {
             margin-right: 12px;
-            color: #ff5252; /* PDF red */
+            color: #ff5252;
+            /* PDF red */
         }
 
         .file-name {
@@ -283,8 +297,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         .loading-text {
@@ -355,7 +374,9 @@
         }
 
         @media (max-width: 768px) {
-            .user-bar-left, .user-bar-right {
+
+            .user-bar-left,
+            .user-bar-right {
                 position: static !important;
                 justify-content: center;
                 margin-bottom: 12px;
@@ -363,11 +384,14 @@
         }
     </style>
 </head>
+
 <body>
 
     <div class="user-bar-left">
-        <span style="background: rgba(22, 26, 37, 0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--border-color); border-radius: 20px; padding: 7px 16px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);">
-            <span style="width: 7px; height: 7px; background-color: var(--success-color); border-radius: 50%; box-shadow: 0 0 8px var(--success-color);"></span>
+        <span
+            style="background: rgba(22, 26, 37, 0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--border-color); border-radius: 20px; padding: 7px 16px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);">
+            <span
+                style="width: 7px; height: 7px; background-color: var(--success-color); border-radius: 50%; box-shadow: 0 0 8px var(--success-color);"></span>
             <strong style="color: #fff; font-weight: 700;">{{ company_name }}</strong>
             <span style="opacity: 0.25; color: var(--text-muted);">|</span>
             <span style="color: var(--text-muted); font-weight: 400;">{{ username }}</span>
@@ -388,10 +412,9 @@
             display: flex; align-items: center; gap: 6px;
             cursor: pointer;
             box-shadow: 0 0 10px rgba(6, 182, 212, 0.15);
-        "
-        title="Chart of Accounts Manager"
-        onmouseover="this.style.color='#fff';this.style.background='rgba(6,182,212,0.35)';this.style.borderColor='#22d3ee';this.style.transform='translateY(-1px)'"
-        onmouseout="this.style.color='#67e8f9';this.style.background='rgba(6,182,212,0.15)';this.style.borderColor='rgba(6, 182, 212, 0.35)';this.style.transform='none'">
+        " title="Chart of Accounts Manager"
+            onmouseover="this.style.color='#fff';this.style.background='rgba(6,182,212,0.35)';this.style.borderColor='#22d3ee';this.style.transform='translateY(-1px)'"
+            onmouseout="this.style.color='#67e8f9';this.style.background='rgba(6,182,212,0.15)';this.style.borderColor='rgba(6, 182, 212, 0.35)';this.style.transform='none'">
             📊 COA
         </button>
 
@@ -408,10 +431,9 @@
             display: flex; align-items: center; gap: 6px;
             cursor: pointer;
             box-shadow: 0 0 10px rgba(168, 85, 247, 0.15);
-        "
-        title="Parent-Client Mappings Manager"
-        onmouseover="this.style.color='#fff';this.style.background='rgba(168,85,247,0.35)';this.style.borderColor='#e879f9';this.style.transform='translateY(-1px)'"
-        onmouseout="this.style.color='#c084fc';this.style.background='rgba(168,85,247,0.15)';this.style.borderColor='rgba(168, 85, 247, 0.35)';this.style.transform='none'">
+        " title="Parent-Client Mappings Manager"
+            onmouseover="this.style.color='#fff';this.style.background='rgba(168,85,247,0.35)';this.style.borderColor='#e879f9';this.style.transform='translateY(-1px)'"
+            onmouseout="this.style.color='#c084fc';this.style.background='rgba(168,85,247,0.15)';this.style.borderColor='rgba(168, 85, 247, 0.35)';this.style.transform='none'">
             🔗 MAPING
         </button>
 
@@ -428,10 +450,9 @@
             display: flex; align-items: center; gap: 6px;
             cursor: pointer;
             box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
-        "
-        title="Transaction History Rules Manager"
-        onmouseover="this.style.color='#fff';this.style.background='rgba(16,185,129,0.35)';this.style.borderColor='#34d399';this.style.transform='translateY(-1px)'"
-        onmouseout="this.style.color='#6ee7b7';this.style.background='rgba(16,185,129,0.15)';this.style.borderColor='rgba(16, 185, 129, 0.35)';this.style.transform='none'">
+        " title="Transaction History Rules Manager"
+            onmouseover="this.style.color='#fff';this.style.background='rgba(16,185,129,0.35)';this.style.borderColor='#34d399';this.style.transform='translateY(-1px)'"
+            onmouseout="this.style.color='#6ee7b7';this.style.background='rgba(16,185,129,0.15)';this.style.borderColor='rgba(16, 185, 129, 0.35)';this.style.transform='none'">
             📜 HISTORY
         </button>
 
@@ -446,11 +467,12 @@
             transition: color 0.2s, background 0.2s, transform 0.2s;
             display: flex; align-items: center; gap: 6px;
             cursor: pointer;
-        "
-        onmouseover="this.style.color='#00f2fe';this.style.background='rgba(0,242,254,0.08)';this.style.transform='translateY(-1px)'"
-        onmouseout="this.style.color='var(--text-muted)';this.style.background='rgba(255,255,255,0.04)';this.style.transform='none'">
+        " onmouseover="this.style.color='#00f2fe';this.style.background='rgba(0,242,254,0.08)';this.style.transform='translateY(-1px)'"
+            onmouseout="this.style.color='var(--text-muted)';this.style.background='rgba(255,255,255,0.04)';this.style.transform='none'">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" stroke-linecap="round" stroke-linejoin="round"/>
+                <path
+                    d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"
+                    stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             Support
         </button>
@@ -464,11 +486,11 @@
             text-decoration: none;
             transition: color 0.2s, background 0.2s, transform 0.2s;
             display: flex; align-items: center; gap: 6px;
-        "
-        onmouseover="this.style.color='#ff5252';this.style.background='rgba(255,82,82,0.08)';this.style.transform='translateY(-1px)'"
-        onmouseout="this.style.color='var(--text-muted)';this.style.background='rgba(255,255,255,0.04)';this.style.transform='none'">
+        " onmouseover="this.style.color='#ff5252';this.style.background='rgba(255,82,82,0.08)';this.style.transform='translateY(-1px)'"
+            onmouseout="this.style.color='var(--text-muted)';this.style.background='rgba(255,255,255,0.04)';this.style.transform='none'">
             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke-linecap="round"
+                    stroke-linejoin="round" />
             </svg>
             Sign out
         </a>
@@ -487,7 +509,7 @@
                     <input type="file" id="fileInput" accept=".pdf">
                     <div class="icon-container">
                         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 5V19M12 5L6 11M12 5L18 11" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 5V19M12 5L6 11M12 5L18 11" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </div>
                     <div class="drop-zone-text">
@@ -500,7 +522,8 @@
                     <div class="file-details">
                         <div class="file-icon">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9.5 6H8v5H6.5v-5H5V7.5h4.5V9zm5 5H12v-6.5h2.5c.8 0 1.5.7 1.5 1.5v3.5c0 .8-.7 1.5-1.5 1.5zm-1.5-5v3.5h1v-3.5h-1zm7.5 1.5h-3v1h2v1.5h-2V14H18v-6.5h4.5V9z"/>
+                                <path
+                                    d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9.5 6H8v5H6.5v-5H5V7.5h4.5V9zm5 5H12v-6.5h2.5c.8 0 1.5.7 1.5 1.5v3.5c0 .8-.7 1.5-1.5 1.5zm-1.5-5v3.5h1v-3.5h-1zm7.5 1.5h-3v1h2v1.5h-2V14H18v-6.5h4.5V9z" />
                             </svg>
                         </div>
                         <div>
@@ -509,19 +532,23 @@
                         </div>
                     </div>
                     <button class="remove-file" id="removeFileBtn" title="Remove file">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </button>
                 </div>
 
                 <div style="margin: 16px 0; text-align: left;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-main); font-size: 0.88rem; font-weight: 500; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 12px; transition: border-color 0.2s ease;">
-                        <input type="checkbox" id="useHistoryGlCheckbox" style="accent-color: #e100ff; width: 16px; height: 16px; cursor: pointer;">
+                    <label
+                        style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-main); font-size: 0.88rem; font-weight: 500; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 12px; transition: border-color 0.2s ease;">
+                        <input type="checkbox" id="useHistoryGlCheckbox"
+                            style="accent-color: #e100ff; width: 16px; height: 16px; cursor: pointer;">
                         <span>Auto-assign GL accounts using Client Transaction History</span>
                     </label>
                     <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 4px; margin-left: 26px;">
-                        Unchecked (default): Assigns standard default GL codes (260 for Deposits, 500/656 for Withdrawals).
+                        Unchecked (default): Assigns standard default GL codes (260 for Deposits, 500/656 for
+                        Withdrawals).
                     </div>
                 </div>
 
@@ -538,19 +565,30 @@
             <!-- Results State -->
             <div id="resultsContainer" style="display: none;">
                 <!-- Header with bank/business info -->
-                <div class="results-header" style="margin-bottom: 24px; text-align: left; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                    <h2 id="resultBusinessName" style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Business Name</h2>
-                    <p id="resultPeriod" style="color: var(--text-muted); font-size: 1.05rem; font-weight: 500; margin-top: 4px; margin-bottom: 8px; font-family: 'Outfit', sans-serif; display: none;">Period</p>
-                    <p id="resultBankType" style="color: var(--text-muted); font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Bank Type</p>
+                <div class="results-header"
+                    style="margin-bottom: 24px; text-align: left; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                    <h2 id="resultBusinessName"
+                        style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
+                        Business Name</h2>
+                    <p id="resultPeriod"
+                        style="color: var(--text-muted); font-size: 1.05rem; font-weight: 500; margin-top: 4px; margin-bottom: 8px; font-family: 'Outfit', sans-serif; display: none;">
+                        Period</p>
+                    <p id="resultBankType"
+                        style="color: var(--text-muted); font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Bank Type</p>
                 </div>
-                
+
                 <!-- Warnings container -->
-                <div id="resultsWarnings" style="display: none; margin-bottom: 24px; text-align: left; padding: 16px; background: rgba(255, 171, 0, 0.08); border: 1px solid rgba(255, 171, 0, 0.3); border-radius: 8px; backdrop-filter: blur(10px);">
+                <div id="resultsWarnings"
+                    style="display: none; margin-bottom: 24px; text-align: left; padding: 16px; background: rgba(255, 171, 0, 0.08); border: 1px solid rgba(255, 171, 0, 0.3); border-radius: 8px; backdrop-filter: blur(10px);">
                     <div style="display: flex; align-items: flex-start; gap: 12px;">
                         <span style="color: #ffab00; font-size: 1.5rem; line-height: 1;">⚠️</span>
                         <div>
-                            <h4 style="margin: 0 0 6px 0; font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700; color: #ffab00;">Reconciliation Verification Warning</h4>
-                            <div id="resultsWarningsList" style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.5; font-family: 'Inter', sans-serif;">
+                            <h4
+                                style="margin: 0 0 6px 0; font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700; color: #ffab00;">
+                                Reconciliation Verification Warning</h4>
+                            <div id="resultsWarningsList"
+                                style="color: var(--text-muted); font-size: 0.92rem; line-height: 1.5; font-family: 'Inter', sans-serif;">
                                 <!-- Warning messages will render here -->
                             </div>
                         </div>
@@ -559,8 +597,10 @@
 
                 <!-- Reconciliation Section -->
                 <div class="reconciliation-section" style="margin-bottom: 32px; text-align: left;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0;">Mathematical Reconciliation</h3>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0;">
+                            Mathematical Reconciliation</h3>
                         <button class="btn" id="viewSummaryPageBtn" style="
                             padding: 8px 16px; font-size: 0.8rem;
                             background: rgba(127, 0, 255, 0.08);
@@ -569,56 +609,85 @@
                             cursor: pointer; transition: all 0.2s ease; margin-top: 0;
                         ">Show Summary Page</button>
                     </div>
-                    <div id="reconciliationCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+                    <div id="reconciliationCards"
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
                         <!-- Reconciliation Cards loaded dynamically -->
                     </div>
                 </div>
 
                 <!-- Transactions Section -->
                 <div class="transactions-section" style="text-align: left;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main);">Transactions</h3>
-                            <span id="txCountBadge" style="background: rgba(225, 0, 255, 0.1); color: #e100ff; border: 1px solid rgba(225, 0, 255, 0.2); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600; white-space: nowrap;">0 records</span>
+                            <span id="txCountBadge"
+                                style="background: rgba(225, 0, 255, 0.1); color: #e100ff; border: 1px solid rgba(225, 0, 255, 0.2); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600; white-space: nowrap;">0
+                                records</span>
                         </div>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                             {% if software_name and software_name.lower() == 'qbo' %}
-                                {% if qbo_connected %}
-                                    <span style="background: rgba(0, 230, 118, 0.1); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.2); border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; white-space: nowrap;" title="Realm ID: {{ qbo_realm_id }}">
-                                        ✓ {{ qbo_company_name or 'Connected to QBO' }}
-                                    </span>
-                                    <a href="/auth/qbo/login" class="btn" style="padding: 6px 12px; font-size: 0.78rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-muted); text-decoration: none; border-radius: 8px; font-weight: 500; white-space: nowrap;" title="Switch to another QuickBooks Company">
-                                        Switch Company
-                                    </a>
-                                    <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-main); font-weight: 500; cursor: pointer; user-select: none; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 12px; white-space: nowrap;">
-                                        <input type="checkbox" id="qboBatchCheckbox" checked style="accent-color: #00e676; cursor: pointer; width: 14px; height: 14px;">
-                                        Batch into 1 Journal Entry
-                                    </label>
-                                    <button class="btn" id="syncQboBtn" style="padding: 8px 18px; font-size: 0.8rem; background: linear-gradient(135deg, #2ca01c 0%, #108000 100%); border: none; color: #ffffff; width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; border-radius: 8px; box-shadow: 0 4px 12px rgba(44, 160, 28, 0.3); white-space: nowrap;">
-                                        Sync to QuickBooks
-                                    </button>
-                                {% else %}
-                                    <a href="/auth/qbo/login" class="btn" style="padding: 8px 18px; font-size: 0.8rem; background: linear-gradient(135deg, #2ca01c 0%, #108000 100%); border: none; color: #ffffff; width: auto; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; box-shadow: 0 4px 12px rgba(44, 160, 28, 0.3); white-space: nowrap;">
-                                        Connect to QuickBooks
-                                    </a>
-                                {% endif %}
-                            {% endif %}
-                            <label style="padding: 8px 18px; font-size: 0.8rem; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;" title="Upload Check Image scan to extract payee and replace Check description">
-                                📷 Upload Check Images
-                                <input type="file" id="uploadCheckImagesInput" accept=".pdf" style="display: none;" onchange="handleCheckPdfUpload(this)">
+                            {% if qbo_connected %}
+                            <span
+                                style="background: rgba(0, 230, 118, 0.1); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.2); border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; white-space: nowrap;"
+                                title="Realm ID: {{ qbo_realm_id }}">
+                                ✓ {{ qbo_company_name or 'Connected to QBO' }}
+                            </span>
+                            <a href="/auth/qbo/login" class="btn"
+                                style="padding: 6px 12px; font-size: 0.78rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-muted); text-decoration: none; border-radius: 8px; font-weight: 500; white-space: nowrap;"
+                                title="Switch to another QuickBooks Company">
+                                Switch Company
+                            </a>
+                            <label
+                                style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-main); font-weight: 500; cursor: pointer; user-select: none; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 12px; white-space: nowrap;">
+                                <input type="checkbox" id="qboBatchCheckbox" checked
+                                    style="accent-color: #00e676; cursor: pointer; width: 14px; height: 14px;">
+                                Batch into 1 Journal Entry
                             </label>
-                            <button class="btn" id="downloadCsvBtn" style="padding: 8px 18px; font-size: 0.8rem; background: rgba(0, 230, 118, 0.08); border: 1px solid rgba(0, 230, 118, 0.2); color: var(--success-color); width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;">Download CSV</button>
+                            <button class="btn" id="syncQboBtn"
+                                style="padding: 8px 18px; font-size: 0.8rem; background: linear-gradient(135deg, #2ca01c 0%, #108000 100%); border: none; color: #ffffff; width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; border-radius: 8px; box-shadow: 0 4px 12px rgba(44, 160, 28, 0.3); white-space: nowrap;">
+                                Sync to QuickBooks
+                            </button>
+                            {% else %}
+                            <a href="/auth/qbo/login" class="btn"
+                                style="padding: 8px 18px; font-size: 0.8rem; background: linear-gradient(135deg, #2ca01c 0%, #108000 100%); border: none; color: #ffffff; width: auto; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; box-shadow: 0 4px 12px rgba(44, 160, 28, 0.3); white-space: nowrap;">
+                                Connect to QuickBooks
+                            </a>
+                            {% endif %}
+                            {% endif %}
+                            <label
+                                style="padding: 8px 18px; font-size: 0.8rem; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;"
+                                title="Upload Check Image scan to extract payee and replace Check description">
+                                📷 Upload Check Images
+                                <input type="file" id="uploadCheckImagesInput" accept=".pdf,.png,.jpg,.jpeg" multiple style="display: none;"
+                                    onchange="handleCheckPdfUpload(this)">
+                            </label>
+                            <button class="btn" id="downloadCsvBtn"
+                                style="padding: 8px 18px; font-size: 0.8rem; background: rgba(0, 230, 118, 0.08); border: 1px solid rgba(0, 230, 118, 0.2); color: var(--success-color); width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;">Download
+                                CSV</button>
                         </div>
                     </div>
-                    <div style="overflow-y: auto; max-height: 450px; border: 1px solid var(--border-color); border-radius: 16px; background: rgba(0, 0, 0, 0.25); box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);">
+                    <div
+                        style="overflow-y: auto; max-height: 450px; border: 1px solid var(--border-color); border-radius: 16px; background: rgba(0, 0, 0, 0.25); box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                            <thead style="position: sticky; top: 0; background: #141722; z-index: 10; box-shadow: 0 1px 0 var(--border-color);">
+                            <thead
+                                style="position: sticky; top: 0; background: #141722; z-index: 10; box-shadow: 0 1px 0 var(--border-color);">
                                 <tr style="text-align: left;">
-                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Date</th>
-                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Check #</th>
-                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">Description</th>
-                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-align: right;">Deposits</th>
-                                    <th style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-align: right;">Withdrawals</th>
+                                    <th
+                                        style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
+                                        Date</th>
+                                    <th
+                                        style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
+                                        Check #</th>
+                                    <th
+                                        style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);">
+                                        Description</th>
+                                    <th
+                                        style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-align: right;">
+                                        Deposits</th>
+                                    <th
+                                        style="padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-align: right;">
+                                        Withdrawals</th>
                                 </tr>
                             </thead>
                             <tbody id="transactionsTableBody">
@@ -629,7 +698,9 @@
                 </div>
 
                 <!-- Back button -->
-                <button class="btn" id="backToUploadBtn" style="margin-top: 32px; width: auto; padding: 12px 24px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 600;">← Upload Another Statement</button>
+                <button class="btn" id="backToUploadBtn"
+                    style="margin-top: 32px; width: auto; padding: 12px 24px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: var(--text-main); font-weight: 600;">←
+                    Upload Another Statement</button>
             </div>
 
             <!-- Alert Messaging -->
@@ -680,7 +751,8 @@
                 justify-content: space-between;
                 align-items: center;
             ">
-                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main);" id="summaryModalTitle">Statement Summary Page</h3>
+                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main);"
+                    id="summaryModalTitle">Statement Summary Page</h3>
                 <button id="closeSummaryModalBtn" style="
                     background: transparent;
                     border: none;
@@ -694,7 +766,7 @@
                     justify-content: center;
                 ">
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </button>
             </div>
@@ -759,7 +831,9 @@
                 justify-content: space-between;
                 align-items: center;
             ">
-                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main);">Send Support Request</h3>
+                <h3
+                    style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main);">
+                    Send Support Request</h3>
                 <button id="closeSupportModalBtn" style="
                     background: transparent;
                     border: none;
@@ -773,7 +847,7 @@
                     justify-content: center;
                 ">
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                 </button>
             </div>
@@ -787,7 +861,8 @@
                 gap: 16px;
             ">
                 <div>
-                    <label style="display: block; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">MESSAGE</label>
+                    <label
+                        style="display: block; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">MESSAGE</label>
                     <textarea id="supportMessage" placeholder="Describe the issue or request here..." style="
                         width: 100%;
                         height: 150px;
@@ -801,11 +876,14 @@
                         resize: none;
                         outline: none;
                         transition: border-color 0.2s;
-                    " onfocus="this.style.borderColor='#00f2fe'" onblur="this.style.borderColor='var(--border-color)'"></textarea>
+                    " onfocus="this.style.borderColor='#00f2fe'"
+                        onblur="this.style.borderColor='var(--border-color)'"></textarea>
                 </div>
-                
+
                 <div>
-                    <label style="display: block; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">ATTACH FILE (OPTIONAL)</label>
+                    <label
+                        style="display: block; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">ATTACH
+                        FILE (OPTIONAL)</label>
                     <div id="supportAttachmentArea" style="
                         border: 1.5px dashed rgba(255, 255, 255, 0.15);
                         border-radius: 12px;
@@ -814,15 +892,20 @@
                         cursor: pointer;
                         background: rgba(255, 255, 255, 0.01);
                         transition: all 0.2s;
-                    " onmouseover="this.style.borderColor='#00f2fe';this.style.background='rgba(0,242,254,0.02)'" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.15)';this.style.background='rgba(255, 255, 255, 0.01)'">
+                    " onmouseover="this.style.borderColor='#00f2fe';this.style.background='rgba(0,242,254,0.02)'"
+                        onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.15)';this.style.background='rgba(255, 255, 255, 0.01)'">
                         <input type="file" id="supportFileInput" style="display: none;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="margin: 0 auto 8px;">
-                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke-linecap="round" stroke-linejoin="round"/>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)"
+                            stroke-width="2" style="margin: 0 auto 8px;">
+                            <path
+                                d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                                stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
-                        <span id="supportFileText" style="font-size: 0.85rem; color: var(--text-muted);">Choose a file or drag it here</span>
+                        <span id="supportFileText" style="font-size: 0.85rem; color: var(--text-muted);">Choose a file
+                            or drag it here</span>
                     </div>
                 </div>
-                
+
                 <button class="btn" id="sendSupportBtn" style="
                     margin-top: 12px;
                     background: var(--secondary-grad);
@@ -833,50 +916,77 @@
     </div>
 
     <!-- COA Modal -->
-    <div id="coaModal" class="app-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
-        <div style="background: #0b1324; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 20px; max-width: 95%; width: 950px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
+    <div id="coaModal" class="app-modal"
+        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div
+            style="background: #0b1324; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 20px; max-width: 95%; width: 950px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
                 <div>
-                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; color: #fff;">
+                    <h3
+                        style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; color: #fff;">
                         📊 Chart of Accounts <span style="color: #22d3ee;">Manager</span>
                     </h3>
                     <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
-                        Parent: <strong style="color: #22d3ee;" id="coaParentNameDisplay">{{ parent_name or company_name or 'VRT Services' }}</strong> — View, add, edit, delete, or upload Chart of Accounts CSV files.
+                        Parent: <strong style="color: #22d3ee;" id="coaParentNameDisplay">{{ parent_name or company_name
+                            or 'VRT Services' }}</strong> — View, add, edit, delete, or upload Chart of Accounts CSV
+                        files.
                     </p>
                 </div>
-                <button onclick="closeCoaModal()" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
+                <button onclick="closeCoaModal()"
+                    style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Select Client:</label>
-                    <select id="coaClientSelect" style="background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;" onchange="fetchCoaRecords()"></select>
+                    <label
+                        style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Select
+                        Client:</label>
+                    <select id="coaClientSelect"
+                        style="background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;"
+                        onchange="fetchCoaRecords()"></select>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <input type="text" id="coaSearchInput" placeholder="Search account code or name..." style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; width: 220px; outline: none;" oninput="renderCoaTable()">
-                    <label style="padding: 6px 14px; background: #0891b2; color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 12px rgba(6, 182, 212, 0.3);">
+                    <input type="text" id="coaSearchInput" placeholder="Search account code or name..."
+                        style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; width: 220px; outline: none;"
+                        oninput="renderCoaTable()">
+                    <label
+                        style="padding: 6px 14px; background: #0891b2; color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 12px rgba(6, 182, 212, 0.3);">
                         📁 Upload CSV
-                        <input type="file" id="coaCsvInput" accept=".csv" style="display: none;" onchange="handleCoaCsvUpload(this)">
+                        <input type="file" id="coaCsvInput" accept=".csv" style="display: none;"
+                            onchange="handleCoaCsvUpload(this)">
                     </label>
-                    <button id="toggleCoaFormBtn" onclick="toggleCoaForm()" style="padding: 6px 14px; background: linear-gradient(135deg, #06b6d4, #2563eb); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border: none; border-radius: 10px; cursor: pointer;">
+                    <button id="toggleCoaFormBtn" onclick="toggleCoaForm()"
+                        style="padding: 6px 14px; background: linear-gradient(135deg, #06b6d4, #2563eb); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border: none; border-radius: 10px; cursor: pointer;">
                         ➕ Add Account
                     </button>
                 </div>
             </div>
 
-            <form id="coaForm" style="display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 12px; padding: 14px; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));" onsubmit="saveCoaRecord(event)">
+            <form id="coaForm"
+                style="display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 12px; padding: 14px; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));"
+                onsubmit="saveCoaRecord(event)">
                 <input type="hidden" id="coaFormId">
                 <div>
-                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account Number *</label>
-                    <input type="text" id="coaFormNumber" required placeholder="e.g. 6100" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                    <label
+                        style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account
+                        Number *</label>
+                    <input type="text" id="coaFormNumber" required placeholder="e.g. 6100"
+                        style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account Name *</label>
-                    <input type="text" id="coaFormName" required placeholder="e.g. Automobile Expenses" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                    <label
+                        style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account
+                        Name *</label>
+                    <input type="text" id="coaFormName" required placeholder="e.g. Automobile Expenses"
+                        style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Type</label>
-                    <select id="coaFormType" style="width: 100%; background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                    <label
+                        style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Type</label>
+                    <select id="coaFormType"
+                        style="width: 100%; background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
                         <option value="Expense">Expense</option>
                         <option value="Income">Income</option>
                         <option value="Current Asset">Current Asset</option>
@@ -887,14 +997,18 @@
                     </select>
                 </div>
                 <div style="display: flex; align-items: flex-end;">
-                    <button type="submit" id="coaFormSubmitBtn" style="width: 100%; padding: 8px; background: #0891b2; color: #fff; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; border: none; border-radius: 8px; cursor: pointer;">Save Account</button>
+                    <button type="submit" id="coaFormSubmitBtn"
+                        style="width: 100%; padding: 8px; background: #0891b2; color: #fff; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; border: none; border-radius: 8px; cursor: pointer;">Save
+                        Account</button>
                 </div>
             </form>
 
-            <div style="overflow-y: auto; flex: 1; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
+            <div
+                style="overflow-y: auto; flex: 1; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
                 <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
                     <thead style="position: sticky; top: 0; background: #141722; z-index: 10;">
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">
+                        <tr
+                            style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">
                             <th style="padding: 10px 16px;">Parent Name</th>
                             <th style="padding: 10px 16px;">Account #</th>
                             <th style="padding: 10px 16px;">Account Name</th>
@@ -908,43 +1022,65 @@
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
-                <span style="font-size: 0.75rem; color: #94a3b8;">Total Accounts: <strong id="coaTotalCount" style="color: #fff;">0</strong></span>
-                <button onclick="closeCoaModal()" style="padding: 8px 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer;">Close Manager</button>
+                <span style="font-size: 0.75rem; color: #94a3b8;">Total Accounts: <strong id="coaTotalCount"
+                        style="color: #fff;">0</strong></span>
+                <button onclick="closeCoaModal()"
+                    style="padding: 8px 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer;">Close
+                    Manager</button>
             </div>
         </div>
     </div>
 
     <!-- Parent-Client Mappings Modal -->
-    <div id="mappingsModal" class="app-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
-        <div style="background: #0b1324; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 20px; max-width: 95%; width: 800px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
+    <div id="mappingsModal" class="app-modal"
+        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div
+            style="background: #0b1324; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 20px; max-width: 95%; width: 800px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
                 <div>
-                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; color: #fff;">
+                    <h3
+                        style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; color: #fff;">
                         🔗 Parent-Client <span style="color: #c084fc;">Mappings Manager</span>
                     </h3>
                     <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
-                        Parent: <strong style="color: #c084fc;" id="mappingsParentDisplay">{{ parent_name or company_name or 'VRT Services' }}</strong> — View and add client names for this company.
+                        Parent: <strong style="color: #c084fc;" id="mappingsParentDisplay">{{ parent_name or
+                            company_name or 'VRT Services' }}</strong> — View and add client names for this company.
                     </p>
                 </div>
-                <button onclick="closeMappingsModal()" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
+                <button onclick="closeMappingsModal()"
+                    style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
             </div>
 
-            <form style="background: rgba(255,255,255,0.03); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: flex-end;" onsubmit="saveParentMappingRecord(event)">
+            <form
+                style="background: rgba(255,255,255,0.03); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: flex-end;"
+                onsubmit="saveParentMappingRecord(event)">
                 <div>
-                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Parent / Company Name *</label>
-                    <input type="text" id="mapFormParent" readonly value="{{ parent_name or company_name or 'VRT Services' }}" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #cbd5e1; opacity: 0.8;">
+                    <label
+                        style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Parent
+                        / Company Name *</label>
+                    <input type="text" id="mapFormParent" readonly
+                        value="{{ parent_name or company_name or 'VRT Services' }}"
+                        style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #cbd5e1; opacity: 0.8;">
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Enter Client Name *</label>
-                    <input type="text" id="mapFormClient" required placeholder="e.g. New Client Name" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                    <label
+                        style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Enter
+                        Client Name *</label>
+                    <input type="text" id="mapFormClient" required placeholder="e.g. New Client Name"
+                        style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
                 </div>
-                <button type="submit" style="padding: 8px 16px; background: #9333ea; color: #fff; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; border: none; border-radius: 8px; cursor: pointer; white-space: nowrap;">➕ Add Client</button>
+                <button type="submit"
+                    style="padding: 8px 16px; background: #9333ea; color: #fff; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; border: none; border-radius: 8px; cursor: pointer; white-space: nowrap;">➕
+                    Add Client</button>
             </form>
 
-            <div style="overflow-y: auto; flex: 1; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
+            <div
+                style="overflow-y: auto; flex: 1; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
                 <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
                     <thead style="position: sticky; top: 0; background: #141722; z-index: 10;">
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">
+                        <tr
+                            style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">
                             <th style="padding: 10px 16px;">Parent Name</th>
                             <th style="padding: 10px 16px;">Associated Client</th>
                             <th style="padding: 10px 16px; text-align: right;">Actions</th>
@@ -956,79 +1092,121 @@
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
-                <span style="font-size: 0.75rem; color: #94a3b8;">Total Mappings: <strong id="mappingsTotalCount" style="color: #fff;">0</strong></span>
-                <button onclick="closeMappingsModal()" style="padding: 8px 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer;">Close Manager</button>
+                <span style="font-size: 0.75rem; color: #94a3b8;">Total Mappings: <strong id="mappingsTotalCount"
+                        style="color: #fff;">0</strong></span>
+                <button onclick="closeMappingsModal()"
+                    style="padding: 8px 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer;">Close
+                    Manager</button>
             </div>
         </div>
     </div>
 
     <!-- History Rules Modal -->
-    <div id="historyModal" class="app-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
-        <div style="background: #0b1324; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; max-width: 95%; width: 950px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
+    <div id="historyModal" class="app-modal"
+        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div
+            style="background: #0b1324; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; max-width: 95%; width: 950px; max-height: 90vh; display: flex; flex-direction: column; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.3s ease; gap: 20px; color: #fff;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
                 <div>
-                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; color: #fff;">
+                    <h3
+                        style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; text-transform: uppercase; letter-spacing: -0.5px; margin: 0; color: #fff;">
                         📜 Transaction History <span style="color: #34d399;">Rules Manager</span>
                     </h3>
                     <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">
-                        Parent: <strong style="color: #34d399;" id="historyParentNameDisplay">{{ parent_name or company_name or 'VRT Services' }}</strong> — View, add, edit, delete, or upload vendor transaction matching rules.
+                        Parent: <strong style="color: #34d399;" id="historyParentNameDisplay">{{ parent_name or
+                            company_name or 'VRT Services' }}</strong> — View, add, edit, delete, or upload vendor
+                        transaction matching rules.
                     </p>
                 </div>
-                <button onclick="closeHistoryModal()" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
+                <button onclick="closeHistoryModal()"
+                    style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; padding: 4px;">✕</button>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Select Client:</label>
-                    <select id="historyClientSelect" style="background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;" onchange="fetchHistoryRecords()"></select>
+                    <label
+                        style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8;">Select
+                        Client:</label>
+                    <select id="historyClientSelect"
+                        style="background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; outline: none;"
+                        onchange="fetchHistoryRecords()"></select>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <input type="text" id="historySearchInput" placeholder="Search vendor pattern or code..." style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; width: 220px; outline: none;" oninput="renderHistoryTable()">
-                    <label style="padding: 6px 14px; background: #059669; color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);">
+                    <input type="text" id="historySearchInput" placeholder="Search vendor pattern or code..."
+                        style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 12px; font-size: 0.85rem; color: #fff; width: 220px; outline: none;"
+                        oninput="renderHistoryTable()">
+                    <label
+                        style="padding: 6px 14px; background: #059669; color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);">
                         📁 Upload CSV
-                        <input type="file" id="historyCsvInput" accept=".csv" style="display: none;" onchange="handleHistoryCsvUpload(this)">
+                        <input type="file" id="historyCsvInput" accept=".csv" style="display: none;"
+                            onchange="handleHistoryCsvUpload(this)">
                     </label>
-                    <button id="toggleHistoryFormBtn" onclick="toggleHistoryForm()" style="padding: 6px 14px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border: none; border-radius: 10px; cursor: pointer;">
+                    <button id="toggleHistoryFormBtn" onclick="toggleHistoryForm()"
+                        style="padding: 6px 14px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border: none; border-radius: 10px; cursor: pointer;">
                         ➕ Add Rule
                     </button>
                 </div>
             </div>
 
-            <form id="historyForm" style="display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 14px; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));" onsubmit="saveHistoryRecord(event)">
+            <form id="historyForm"
+                style="display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 14px; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));"
+                onsubmit="saveHistoryRecord(event)">
                 <input type="hidden" id="historyFormId">
                 <div>
-                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Vendor Pattern *</label>
-                    <input type="text" id="historyFormPattern" required placeholder="e.g. FPL" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff; text-transform: uppercase;">
+                    <label
+                        style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Vendor
+                        Pattern *</label>
+                    <input type="text" id="historyFormPattern" required placeholder="e.g. FPL"
+                        style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff; text-transform: uppercase;">
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account Number *</label>
-                    <input type="text" id="historyFormNumber" required placeholder="e.g. 6300" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                    <label
+                        style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account
+                        Number *</label>
+                    <input type="text" id="historyFormNumber" required placeholder="e.g. 6300"
+                        style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account Name</label>
-                    <input type="text" id="historyFormName" placeholder="e.g. Utilities" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                    <label
+                        style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Account
+                        Name</label>
+                    <input type="text" id="historyFormName" placeholder="e.g. Utilities"
+                        style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Tx Type</label>
-                    <select id="historyFormTxType" style="width: 100%; background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
+                    <label
+                        style="display: block; font-size: 0.7rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px;">Tx
+                        Type</label>
+                    <select id="historyFormTxType"
+                        style="width: 100%; background: #0b1324; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; color: #fff;">
                         <option value="ALL">ALL</option>
                         <option value="DEPOSIT">DEPOSIT</option>
                         <option value="WITHDRAWAL">WITHDRAWAL</option>
                     </select>
                 </div>
                 <div style="display: flex; align-items: flex-end;">
-                    <button type="submit" id="historyFormSubmitBtn" style="width: 100%; padding: 8px; background: #059669; color: #fff; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; border: none; border-radius: 8px; cursor: pointer;">Save Rule</button>
+                    <button type="submit" id="historyFormSubmitBtn"
+                        style="width: 100%; padding: 8px; background: #059669; color: #fff; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; border: none; border-radius: 8px; cursor: pointer;">Save
+                        Rule</button>
                 </div>
             </form>
 
-            <div style="overflow-y: auto; flex: 1; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
+            <div
+                style="overflow-y: auto; flex: 1; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
                 <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
                     <thead style="position: sticky; top: 0; background: #141722; z-index: 10;">
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; user-select: none;">
+                        <tr
+                            style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; user-select: none;">
                             <th style="padding: 10px 16px;">Parent Name</th>
-                            <th style="padding: 10px 16px; cursor: pointer;" onclick="handleHistorySort('pattern')">Vendor Pattern <span id="sortPatternArrow">↕</span></th>
-                            <th style="padding: 10px 16px; cursor: pointer;" onclick="handleHistorySort('accountNumber')">Account # <span id="sortAccountArrow">↕</span></th>
-                            <th style="padding: 10px 16px; cursor: pointer;" onclick="handleHistorySort('accountName')">Account Name <span id="sortNameArrow">↕</span></th>
+                            <th style="padding: 10px 16px; cursor: pointer;" onclick="handleHistorySort('pattern')">
+                                Vendor Pattern <span id="sortPatternArrow">↕</span></th>
+                            <th style="padding: 10px 16px; cursor: pointer;"
+                                onclick="handleHistorySort('accountNumber')">Account # <span
+                                    id="sortAccountArrow">↕</span></th>
+                            <th style="padding: 10px 16px; cursor: pointer;" onclick="handleHistorySort('accountName')">
+                                Account Name <span id="sortNameArrow">↕</span></th>
                             <th style="padding: 10px 16px;">Tx Type</th>
                             <th style="padding: 10px 16px; text-align: right;">Actions</th>
                         </tr>
@@ -1039,8 +1217,11 @@
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
-                <span style="font-size: 0.75rem; color: #94a3b8;">Total Rules: <strong id="historyTotalCount" style="color: #fff;">0</strong></span>
-                <button onclick="closeHistoryModal()" style="padding: 8px 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer;">Close Manager</button>
+                <span style="font-size: 0.75rem; color: #94a3b8;">Total Rules: <strong id="historyTotalCount"
+                        style="color: #fff;">0</strong></span>
+                <button onclick="closeHistoryModal()"
+                    style="padding: 8px 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; border-radius: 10px; cursor: pointer;">Close
+                    Manager</button>
             </div>
         </div>
     </div>
@@ -1071,6 +1252,11 @@
 
         // File Selection handling
         fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 1) {
+                showAlert('Multiple file selection is not allowed. Please select only a single bank statement PDF.', 'error');
+                fileInput.value = '';
+                return;
+            }
             if (e.target.files.length > 0) {
                 handleFile(e.target.files[0]);
             }
@@ -1096,6 +1282,10 @@
         dropZone.addEventListener('drop', (e) => {
             const dt = e.dataTransfer;
             const files = dt.files;
+            if (files.length > 1) {
+                showAlert('Multiple file drop is not allowed. Please drop only a single bank statement PDF.', 'error');
+                return;
+            }
             if (files.length > 0) {
                 handleFile(files[0]);
             }
@@ -1109,7 +1299,7 @@
             selectedFile = file;
             fileName.textContent = file.name;
             fileSize.textContent = formatBytes(file.size);
-            
+
             fileInfoBox.style.display = 'flex';
             processBtn.disabled = false;
             hideAlert();
@@ -1186,7 +1376,7 @@
 
         function formatAmt(val) {
             if (val === null || val === undefined || isNaN(val)) return '';
-            return '$' + Number(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            return '$' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         function displayResults(result) {
@@ -1194,7 +1384,7 @@
 
             // Populate and display results
             document.getElementById('resultBusinessName').textContent = result.business_name || 'Business Name Not Detected';
-            
+
             const periodEl = document.getElementById('resultPeriod');
             if (result.period) {
                 periodEl.textContent = result.period;
@@ -1224,21 +1414,21 @@
             // Populate reconciliation cards
             const reconContainer = document.getElementById('reconciliationCards');
             reconContainer.innerHTML = '';
-            
+
             result.reconciliation.forEach(item => {
                 const isReconciled = Math.abs(item.Difference) < 0.01;
-                const diffText = isReconciled 
-                    ? '✓ Reconciled (Diff: $0.00)' 
-                    : `✗ Discrepancy (Diff: $${item.Difference.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})})`;
+                const diffText = isReconciled
+                    ? '✓ Reconciled (Diff: $0.00)'
+                    : `✗ Discrepancy (Diff: $${item.Difference.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
                 const statusColor = isReconciled ? 'var(--success-color)' : 'var(--error-color)';
-                
+
                 const card = document.createElement('div');
                 card.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);';
                 card.innerHTML = `
                     <h4 style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">${item.Category}</h4>
-                    <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; font-family: 'Outfit', sans-serif;">$${item['Detail Sum'].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; font-family: 'Outfit', sans-serif;">$${item['Detail Sum'].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     <div style="font-size: 0.85rem; color: ${statusColor}; font-weight: 600; display: flex; align-items: center;">${diffText}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Summary total: $${item['Summary Amount'].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${item['Items Count']} items)</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Summary total: $${item['Summary Amount'].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${item['Items Count']} items)</div>
                 `;
                 reconContainer.appendChild(card);
             });
@@ -1248,7 +1438,7 @@
             tableHead.innerHTML = '';
             const headerRow = document.createElement('tr');
             headerRow.style.textAlign = 'left';
-            
+
             const firstTx = result.transactions[0] || {};
             let keys = Object.keys(firstTx).filter(k => !['account_name', 'match_confidence', 'match_source'].includes(k));
             if (keys.includes('account')) {
@@ -1260,7 +1450,7 @@
                     keys.unshift('account');
                 }
             }
-            
+
             keys.forEach(key => {
                 const th = document.createElement('th');
                 th.style.cssText = 'padding: 14px 16px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color);';
@@ -1274,7 +1464,7 @@
 
             const tableBody = document.getElementById('transactionsTableBody');
             tableBody.innerHTML = '';
-            
+
             document.getElementById('txCountBadge').textContent = `${result.transactions.length} records`;
 
             result.transactions.forEach(tx => {
@@ -1282,13 +1472,13 @@
                 tr.style.cssText = 'border-bottom: 1px solid rgba(255, 255, 255, 0.04); transition: background 0.2s ease;';
                 tr.addEventListener('mouseenter', () => tr.style.background = 'rgba(255,255,255,0.02)');
                 tr.addEventListener('mouseleave', () => tr.style.background = 'transparent');
-                
+
                 keys.forEach(key => {
                     const td = document.createElement('td');
                     td.style.padding = '12px 16px';
-                    
+
                     let val = tx[key];
-                    
+
                     if (key === 'date') {
                         td.style.color = 'var(--text-main)';
                         td.style.fontWeight = '500';
@@ -1299,7 +1489,7 @@
                         const accNum = tx.account || '';
                         const accName = tx.account_name || '';
                         const isMatched = tx.match_source === 'Matched';
-                        
+
                         let contentHTML = `<span style="font-weight: 700; color: #f5f6fa;">${accNum}</span>`;
                         if (accName && accName !== 'Unassigned Fallback' && !accName.startsWith('Default ')) {
                             contentHTML += ` <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 400;">(${accName})</span>`;
@@ -1368,7 +1558,7 @@
 
         downloadCsvBtn.addEventListener('click', () => {
             if (!currentResult || !currentResult.transactions || currentResult.transactions.length === 0) return;
-            
+
             try {
                 const mapping = window.CLIENT_CONFIG.csv_mapping;
                 const csvHeaders = mapping.headers;
@@ -1384,7 +1574,7 @@
                 }
 
                 currentResult.transactions.forEach(tx => {
-                    const hasDebit  = tx.Deposits  !== null && tx.Deposits  !== undefined && tx.Deposits  !== '';
+                    const hasDebit = tx.Deposits !== null && tx.Deposits !== undefined && tx.Deposits !== '';
                     const hasCredit = tx.Withdrawals !== null && tx.Withdrawals !== undefined && tx.Withdrawals !== '';
 
                     const row = mapping.fields.map(f => {
@@ -1414,11 +1604,11 @@
                     });
                     csvRows.push(row.join(','));
                 });
-                
+
                 const csvContent = csvRows.join('\r\n');
                 const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
-                
+
                 let baseName = 'statement';
                 if (currentResult.business_name) {
                     baseName = currentResult.business_name;
@@ -1428,12 +1618,12 @@
                 } else if (currentResult.period) {
                     baseName = currentResult.period;
                 }
-                
+
                 let sanitized = baseName.replace(/[\\/:-]/g, '-');
                 sanitized = sanitized.replace(/[*?"<>|]/g, '');
                 sanitized = sanitized.replace(/\s+/g, ' ').replace(/-+/g, '-').trim();
                 const filename = sanitized + '.csv';
-                
+
                 const link = document.createElement('a');
                 link.href = url;
                 link.download = filename;
@@ -1453,8 +1643,7 @@
 
         // Check Image Document Upload & Transaction Description Replacement Handler
         async function handleCheckPdfUpload(input) {
-            const file = input.files?.[0];
-            if (!file) return;
+            if (!input.files || input.files.length === 0) return;
 
             if (!currentResult || !currentResult.transactions || currentResult.transactions.length === 0) {
                 showAlert('Please process a bank statement first before uploading check images.', 'error');
@@ -1462,76 +1651,98 @@
                 return;
             }
 
-            showAlert('Processing check image document...', 'info');
-            const formData = new FormData();
-            formData.append('file', file);
+            const allowedExts = ['.pdf', '.png', '.jpg', '.jpeg'];
+            const validFiles = Array.from(input.files).filter(file => {
+                const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+                return allowedExts.includes(fileExt);
+            });
+
+            if (validFiles.length === 0) {
+                showAlert('Please select valid check document files (.pdf, .png, .jpg, .jpeg).', 'error');
+                input.value = '';
+                return;
+            }
+
+            let totalUpdatedCount = 0;
+            let processedFilesCount = 0;
+            let allExtractedChecks = [];
 
             try {
-                const response = await fetch('/process-checks', {
-                    method: 'POST',
-                    body: formData
-                });
+                for (let i = 0; i < validFiles.length; i++) {
+                    const file = validFiles[i];
+                    showAlert(`Processing check document ${i + 1} of ${validFiles.length}: ${file.name}...`, 'info');
 
-                if (!response.ok) {
-                    const errData = await response.json().catch(() => ({}));
-                    throw new Error(errData.detail || `Server error (${response.status})`);
-                }
+                    const formData = new FormData();
+                    formData.append('file', file);
 
-                const resData = await response.json();
-                const checks = resData.checks || [];
-                if (checks.length === 0) {
-                    showAlert('No check images or check details could be extracted from the document.', 'error');
-                    input.value = '';
-                    return;
-                }
+                    try {
+                        const response = await fetch('/process-checks', {
+                            method: 'POST',
+                            body: formData
+                        });
 
-                let updatedCount = 0;
-                checks.forEach(chk => {
-                    if (!chk.check_number) return;
-                    const targetNum = String(chk.check_number).trim();
-                    const payee = (chk.payee || '').trim();
-                    if (!payee) return;
-
-                    currentResult.transactions.forEach(tx => {
-                        const txCheckNum = String(tx.checknumber || '').trim();
-                        const txDesc = String(tx.description || '').trim();
-
-                        if (txCheckNum === targetNum || txDesc.includes(targetNum) || (txDesc.toUpperCase().includes('CHECK') && (txCheckNum === targetNum || !txCheckNum))) {
-                            // Update transaction description
-                            tx.description = payee;
-
-                            // Auto-remap GL Account code for known vendor categories
-                            const lowerPayee = payee.toLowerCase();
-                            if (lowerPayee.includes('comcast') || lowerPayee.includes('xfinity') || lowerPayee.includes('att') || lowerPayee.includes('fpl') || lowerPayee.includes('verizon') || lowerPayee.includes('t-mobile') || lowerPayee.includes('utility')) {
-                                tx.account = "795";
-                                tx.account_name = "Utilities & Telecom";
-                                tx.match_source = "Matched";
-                            } else if (lowerPayee.includes('home depot') || lowerPayee.includes('lowes') || lowerPayee.includes('hardware') || lowerPayee.includes('repair')) {
-                                tx.account = "778";
-                                tx.account_name = "Repairs & Maintenance";
-                                tx.match_source = "Matched";
-                            } else if (lowerPayee.includes('publix') || lowerPayee.includes('walmart') || lowerPayee.includes('target') || lowerPayee.includes('costco') || lowerPayee.includes('supplies')) {
-                                tx.account = "782";
-                                tx.account_name = "Supplies & Provisions";
-                                tx.match_source = "Matched";
-                            }
-
-                            updatedCount++;
+                        if (!response.ok) {
+                            console.error(`Failed to process ${file.name}: status ${response.status}`);
+                            continue;
                         }
-                    });
-                });
 
-                if (updatedCount > 0) {
+                        const resData = await response.json();
+                        const checks = resData.checks || [];
+                        allExtractedChecks.push(...checks);
+
+                        checks.forEach(chk => {
+                            if (!chk.check_number) return;
+                            const targetNum = String(chk.check_number).trim();
+                            const payee = (chk.payee || '').trim();
+                            if (!payee) return;
+
+                            currentResult.transactions.forEach(tx => {
+                                const txCheckNum = String(tx.checknumber || '').trim();
+                                const txDesc = String(tx.description || '').trim();
+
+                                if (txCheckNum === targetNum || txDesc.includes(targetNum) || (txDesc.toUpperCase().includes('CHECK') && (txCheckNum === targetNum || !txCheckNum))) {
+                                    // Update transaction description
+                                    tx.description = payee;
+
+                                    // Auto-remap GL Account code for known vendor categories
+                                    const lowerPayee = payee.toLowerCase();
+                                    if (lowerPayee.includes('comcast') || lowerPayee.includes('xfinity') || lowerPayee.includes('att') || lowerPayee.includes('fpl') || lowerPayee.includes('verizon') || lowerPayee.includes('t-mobile') || lowerPayee.includes('utility')) {
+                                        tx.account = "795";
+                                        tx.account_name = "Utilities & Telecom";
+                                        tx.match_source = "Matched";
+                                    } else if (lowerPayee.includes('home depot') || lowerPayee.includes('lowes') || lowerPayee.includes('hardware') || lowerPayee.includes('repair')) {
+                                        tx.account = "778";
+                                        tx.account_name = "Repairs & Maintenance";
+                                        tx.match_source = "Matched";
+                                    } else if (lowerPayee.includes('publix') || lowerPayee.includes('walmart') || lowerPayee.includes('target') || lowerPayee.includes('costco') || lowerPayee.includes('supplies')) {
+                                        tx.account = "782";
+                                        tx.account_name = "Supplies & Provisions";
+                                        tx.match_source = "Matched";
+                                    }
+
+                                    totalUpdatedCount++;
+                                }
+                            });
+                        });
+                        processedFilesCount++;
+                    } catch (fileErr) {
+                        console.error(`Error processing check file ${file.name}:`, fileErr);
+                    }
+                }
+
+                if (totalUpdatedCount > 0) {
                     displayResults(currentResult);
-                    showAlert(`Successfully matched and updated ${updatedCount} check transaction(s) with payee '${checks[0]?.payee || ''}'!`, 'success');
+                    showAlert(`Successfully processed ${processedFilesCount} check document(s) and matched/updated ${totalUpdatedCount} check transaction(s)!`, 'success');
+                } else if (allExtractedChecks.length > 0) {
+                    const checkNumbers = allExtractedChecks.map(c => c.check_number).filter(Boolean).join(', ');
+                    showAlert(`Processed ${processedFilesCount} check document(s) and extracted payee details, but could not find matching check numbers (${checkNumbers}) in the current transactions table.`, 'error');
                 } else {
-                    const checkNumbers = checks.map(c => c.check_number).filter(Boolean).join(', ');
-                    showAlert(`Extracted check payee '${checks[0]?.payee || ''}', but could not find matching check number (${checkNumbers}) in current table.`, 'error');
+                    showAlert(`Processed ${processedFilesCount} check document(s), but no check details could be extracted.`, 'error');
                 }
 
             } catch (err) {
                 console.error(err);
-                showAlert(`Error processing check images: ${err.message}`, 'error');
+                showAlert(`Error processing check files: ${err.message}`, 'error');
             } finally {
                 input.value = '';
             }
@@ -1561,7 +1772,7 @@
                     const response = await fetch('/api/qbo/export', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
+                        body: JSON.stringify({
                             transactions: currentResult.transactions,
                             batch_mode: isBatch
                         })
@@ -1701,7 +1912,7 @@
             supportFileInput.value = '';
             supportFileText.textContent = 'Choose a file or drag it here';
             supportFileText.style.color = 'var(--text-muted)';
-            
+
             // Show modal
             supportModal.style.display = 'flex';
             supportModal.offsetHeight; // force reflow
@@ -1832,21 +2043,21 @@
                     bank_type: "TRUIST",
                     transactions: [
                         { date: "2026-03-01", checknumber: "101", description: "Deposit Test", Deposits: 1000.0, Withdrawals: null },
-                        { date: "2026-03-02", checknumber: "",    description: "Withdrawal Test", Deposits: null, Withdrawals: 50.0 },
-                        { date: "2026-03-03", checknumber: "205", description: "Check Payment",  Deposits: null, Withdrawals: 200.0 }
+                        { date: "2026-03-02", checknumber: "", description: "Withdrawal Test", Deposits: null, Withdrawals: 50.0 },
+                        { date: "2026-03-03", checknumber: "205", description: "Check Payment", Deposits: null, Withdrawals: 200.0 }
                     ],
                     reconciliation: []
                 };
-                
+
                 displayResults(dummyResult);
-                
+
                 // Show test message
                 const statusDiv = document.createElement('div');
                 statusDiv.id = 'test-status';
                 statusDiv.style.cssText = 'padding: 16px; background: rgba(0, 230, 118, 0.15); border: 1px solid rgba(0, 230, 118, 0.4); border-radius: 12px; margin-bottom: 24px; color: #00e676; font-weight: 600; font-family: "Outfit", sans-serif;';
                 statusDiv.textContent = 'Auto-test mode: Injected dummyResult successfully. Triggering CSV download...';
                 document.querySelector('.container').prepend(statusDiv);
-                
+
                 try {
                     downloadCsvBtn.click();
                     statusDiv.textContent = 'Auto-test: CSV download triggered successfully!';
@@ -1873,10 +2084,10 @@
             try {
                 const res = await fetch(`/api/clients/parent-mappings?parentName=${encodeURIComponent(CURRENT_PARENT_NAME)}`);
                 const data = await res.json();
-                currentParentMappings = (data.mappings || []).filter(m => 
+                currentParentMappings = (data.mappings || []).filter(m =>
                     (m.parentName || '').trim().toLowerCase() === CURRENT_PARENT_NAME.trim().toLowerCase()
                 );
-                
+
                 let clientList = currentParentMappings.map(m => m.clientName.trim());
                 clientList = Array.from(new Set(clientList));
 
@@ -2424,4 +2635,5 @@
         }
     </script>
 </body>
+
 </html>
