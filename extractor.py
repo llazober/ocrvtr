@@ -1766,3 +1766,158 @@ def run_extraction(pdf_path, temp_dir, create_csv=False, use_history=False, clie
         "summary_page_image": summary_page_image_b64,
         "warnings": warnings
     }
+
+def group_words_to_lines(words, y_tol=10):
+    sorted_words = sorted(words, key=lambda w: w['center_y'])
+    lines = []
+    for w in sorted_words:
+        placed = False
+        for line in lines:
+            avg_y = sum(item['center_y'] for item in line) / len(line)
+            if abs(w['center_y'] - avg_y) <= y_tol:
+                line.append(w)
+                placed = True
+                break
+        if not placed:
+            lines.append([w])
+            
+    result = []
+    for line in lines:
+        sorted_line = sorted(line, key=lambda w: w['x_min'])
+        avg_y = sum(w['center_y'] for w in sorted_line) / len(sorted_line)
+        result.append((avg_y, sorted_line))
+    return sorted(result, key=lambda x: x[0])
+
+def extract_check_images(pdf_path, temp_dir):
+    png_paths = convert_pdf_to_png(pdf_path, temp_dir)
+    client = get_vision_client()
+
+    extracted_checks = []
+
+    for png_path in png_paths:
+        words = ocr_page_to_words(client, png_path)
+        if not words:
+            continue
+
+        full_str = ' '.join(w['text'] for w in words)
+        max_x = max(w['x_max'] for w in words)
+        max_y = max(w['y_max'] for w in words)
+
+        # Restrict check region if full page has header/footer statement elements
+        check_region_words = [
+            w for w in words if 250 <= w['center_y'] <= 750
+        ] if any(w['center_y'] > 850 for w in words) else words
+
+        check_lines = group_words_to_lines(check_region_words)
+
+        # 1. Extract Check Number
+        check_number = None
+        header_match = re.search(r'Check\s*(?:Number|Num|#)?\s*[:#]?\s*(\d{3,8})\b', full_str, re.IGNORECASE)
+        if header_match:
+            check_number = header_match.group(1)
+
+        if not check_number:
+            top_right_words = [
+                w for w in check_region_words 
+                if w['center_x'] > (0.6 * max_x) and w['center_y'] < (0.65 * max_y)
+            ]
+            for w in sorted(top_right_words, key=lambda x: x['center_y']):
+                if re.match(r'^\d{3,8}$', w['text'].strip()):
+                    check_number = w['text'].strip()
+                    break
+
+        # 2. Extract Business Name (Top-left of check scan area)
+        business_name = None
+        for avg_y, line_words in check_lines:
+            line_text = ' '.join(w['text'] for w in line_words).strip()
+            line_upper = line_text.upper()
+            if line_words[0]['center_x'] < (0.55 * max_x):
+                if re.search(r'\b(?:INC|LLC|CORP|HOMES|GROUP|SHOP|COMPANY|CO|SERVICES|ENTERPRISES|AUTO)\b', line_upper) or ('TOIRAK' in line_upper):
+                    clean_name = re.sub(r'^\s*AN\s*:\s*\d+\s*', '', line_text, flags=re.IGNORECASE).strip()
+                    if clean_name and len(clean_name) >= 3:
+                        business_name = clean_name
+                        break
+
+        # 3. Extract Payee ("PAY TO THE ORDER OF")
+        payee = None
+        for_payee = None
+        for avg_y, line_words in check_lines:
+            line_text = ' '.join(w['text'] for w in line_words).strip()
+            if re.search(r'^\s*FOR\b', line_text, re.IGNORECASE) or re.search(r'^\s*MEMO\b', line_text, re.IGNORECASE):
+                for_tokens = []
+                past_for = False
+                for w in line_words:
+                    if w['text'].upper() in ['FOR', 'MEMO']:
+                        past_for = True
+                        continue
+                    if past_for:
+                        for_tokens.append(w['text'])
+                if for_tokens:
+                    for_payee = ' '.join(for_tokens).strip()
+
+        order_y = None
+        for avg_y, line_words in check_lines:
+            line_text = ' '.join(w['text'] for w in line_words).strip()
+            line_upper = line_text.upper()
+            if 'ORDER OF' in line_upper or 'PAY TO' in line_upper or 'PAY' in line_upper:
+                order_y = avg_y
+                tokens = []
+                past_anchor = False
+                for w in line_words:
+                    t_upper = w['text'].upper()
+                    if t_upper in ['ORDER', 'OF', 'PAY', 'TO', 'THE']:
+                        past_anchor = True
+                        continue
+                    if past_anchor:
+                        if t_upper in ['DOLLARS', '$', '=']:
+                            continue
+                        if re.match(r'^\$?\d+(?:\.\d+)?=?$', w['text']):
+                            continue
+                        tokens.append(w['text'])
+                if tokens:
+                    payee = ' '.join(tokens).strip()
+                    break
+
+        if not payee and order_y:
+            for avg_y, line_words in check_lines:
+                if abs(avg_y - order_y) <= 35 and avg_y != order_y:
+                    line_text = ' '.join(w['text'] for w in line_words).strip()
+                    line_upper = line_text.upper()
+                    if not any(k in line_upper for k in ['DATE', 'DOLLARS', 'SEVENTY', 'CHECK', 'WELLS', 'BANK', 'FOR', 'MEMO']):
+                        t_list = [w['text'] for w in line_words if 200 < w['center_x'] < 700 and w['text'] not in ['$', '=', '%', '/', '.']]
+                        if t_list:
+                            payee = ' '.join(t_list).strip()
+                            break
+
+        if not payee and for_payee:
+            payee = for_payee
+
+        # 4. Extract Amount
+        amount = None
+        amt_match = re.search(r'Check\s*Amount\s*\$?\s*(\d+(?:\.\d{2})?)', full_str, re.IGNORECASE)
+        if amt_match:
+            try:
+                amount = float(amt_match.group(1))
+            except ValueError:
+                pass
+        if amount is None:
+            amt_match2 = re.search(r'\$\s*(\d+\.\d{2})', full_str)
+            if amt_match2:
+                try:
+                    amount = float(amt_match2.group(1))
+                except ValueError:
+                    pass
+
+        extracted_checks.append({
+            'check_number': check_number,
+            'payee': payee or for_payee,
+            'business_name': business_name,
+            'amount': amount
+        })
+
+    return {
+        'success': True,
+        'count': len(extracted_checks),
+        'checks': extracted_checks
+    }
+

@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from fastapi.exceptions import HTTPException
-from extractor import run_extraction
+from extractor import run_extraction, extract_check_images
 
 app = FastAPI(title="Bank Statement OCR Extractor")
 
@@ -1855,6 +1855,41 @@ async def process_pdf(
     except Exception as e:
         cleanup_temp_dir(temp_dir)
         raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
+
+@app.post("/process-checks")
+async def process_check_pdf(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    allowed, assigned_site = is_user_allowed_on_site(username, request)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=f"Access denied: Your account is assigned to '{assigned_site}'.")
+
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+
+    temp_dir = tempfile.mkdtemp()
+    pdf_path = os.path.join(temp_dir, "input_check.pdf")
+    try:
+        with open(pdf_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+    except Exception as e:
+        cleanup_temp_dir(temp_dir)
+        raise HTTPException(status_code=500, detail=f"Failed to save uploaded check file: {e}")
+
+    try:
+        check_data = extract_check_images(pdf_path, temp_dir)
+        background_tasks.add_task(cleanup_temp_dir, temp_dir)
+        return check_data
+    except Exception as e:
+        cleanup_temp_dir(temp_dir)
+        raise HTTPException(status_code=500, detail=f"Check image extraction failed: {str(e)}")
+
 
 @app.post("/support")
 async def support_submit(

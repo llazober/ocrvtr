@@ -603,6 +603,10 @@
                                     </a>
                                 {% endif %}
                             {% endif %}
+                            <label style="padding: 8px 18px; font-size: 0.8rem; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;" title="Upload Check Image scan to extract payee and replace Check description">
+                                📷 Upload Check Images
+                                <input type="file" id="uploadCheckImagesInput" accept=".pdf" style="display: none;" onchange="handleCheckPdfUpload(this)">
+                            </label>
                             <button class="btn" id="downloadCsvBtn" style="padding: 8px 18px; font-size: 0.8rem; background: rgba(0, 230, 118, 0.08); border: 1px solid rgba(0, 230, 118, 0.2); color: var(--success-color); width: auto; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;">Download CSV</button>
                         </div>
                     </div>
@@ -1446,6 +1450,92 @@
                 showAlert(`Error downloading CSV: ${err.message}`, 'error');
             }
         });
+
+        // Check Image Document Upload & Transaction Description Replacement Handler
+        async function handleCheckPdfUpload(input) {
+            const file = input.files?.[0];
+            if (!file) return;
+
+            if (!currentResult || !currentResult.transactions || currentResult.transactions.length === 0) {
+                showAlert('Please process a bank statement first before uploading check images.', 'error');
+                input.value = '';
+                return;
+            }
+
+            showAlert('Processing check image document...', 'info');
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/process-checks', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.detail || `Server error (${response.status})`);
+                }
+
+                const resData = await response.json();
+                const checks = resData.checks || [];
+                if (checks.length === 0) {
+                    showAlert('No check images or check details could be extracted from the document.', 'error');
+                    input.value = '';
+                    return;
+                }
+
+                let updatedCount = 0;
+                checks.forEach(chk => {
+                    if (!chk.check_number) return;
+                    const targetNum = String(chk.check_number).trim();
+                    const payee = (chk.payee || '').trim();
+                    if (!payee) return;
+
+                    currentResult.transactions.forEach(tx => {
+                        const txCheckNum = String(tx.checknumber || '').trim();
+                        const txDesc = String(tx.description || '').trim();
+
+                        if (txCheckNum === targetNum || txDesc.includes(targetNum) || (txDesc.toUpperCase().includes('CHECK') && (txCheckNum === targetNum || !txCheckNum))) {
+                            // Update transaction description
+                            tx.description = payee;
+
+                            // Auto-remap GL Account code for known vendor categories
+                            const lowerPayee = payee.toLowerCase();
+                            if (lowerPayee.includes('comcast') || lowerPayee.includes('xfinity') || lowerPayee.includes('att') || lowerPayee.includes('fpl') || lowerPayee.includes('verizon') || lowerPayee.includes('t-mobile') || lowerPayee.includes('utility')) {
+                                tx.account = "795";
+                                tx.account_name = "Utilities & Telecom";
+                                tx.match_source = "Matched";
+                            } else if (lowerPayee.includes('home depot') || lowerPayee.includes('lowes') || lowerPayee.includes('hardware') || lowerPayee.includes('repair')) {
+                                tx.account = "778";
+                                tx.account_name = "Repairs & Maintenance";
+                                tx.match_source = "Matched";
+                            } else if (lowerPayee.includes('publix') || lowerPayee.includes('walmart') || lowerPayee.includes('target') || lowerPayee.includes('costco') || lowerPayee.includes('supplies')) {
+                                tx.account = "782";
+                                tx.account_name = "Supplies & Provisions";
+                                tx.match_source = "Matched";
+                            }
+
+                            updatedCount++;
+                        }
+                    });
+                });
+
+                if (updatedCount > 0) {
+                    displayResults(currentResult);
+                    showAlert(`Successfully matched and updated ${updatedCount} check transaction(s) with payee '${checks[0]?.payee || ''}'!`, 'success');
+                } else {
+                    const checkNumbers = checks.map(c => c.check_number).filter(Boolean).join(', ');
+                    showAlert(`Extracted check payee '${checks[0]?.payee || ''}', but could not find matching check number (${checkNumbers}) in current table.`, 'error');
+                }
+
+            } catch (err) {
+                console.error(err);
+                showAlert(`Error processing check images: ${err.message}`, 'error');
+            } finally {
+                input.value = '';
+            }
+        }
 
         // QuickBooks Online Sync Button Listener
         const syncQboBtn = document.getElementById('syncQboBtn');
