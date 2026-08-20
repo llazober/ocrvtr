@@ -1868,6 +1868,13 @@ def extract_check_images(file_path, temp_dir, use_history=True, client_history_f
                         business_name = clean_name
                         break
 
+        if business_name:
+            business_name = re.sub(r'&\s*#\s*39\s*;?', "'", business_name, flags=re.IGNORECASE)
+            business_name = re.sub(r"\s*'\s*", "'", business_name)
+            if check_number:
+                business_name = re.sub(r'\s*\b' + re.escape(check_number) + r'\b\s*$', '', business_name).strip()
+            business_name = re.sub(r'\s*\b\d{4,8}\b\s*$', '', business_name).strip()
+
         # 3. Extract Payee ("PAY TO THE ORDER OF")
         payee = None
         for_payee = None
@@ -1901,7 +1908,7 @@ def extract_check_images(file_path, temp_dir, use_history=True, client_history_f
                     if past_anchor:
                         if t_upper in ['DOLLARS', '$', '=']:
                             continue
-                        if re.match(r'^\$?\d+(?:\.\d+)?=?$', w['text']):
+                        if re.match(r'^\$?\d+(?:,\d{3})*(?:\.\d+)?=?$', w['text']):
                             continue
                         tokens.append(w['text'])
                 if tokens:
@@ -1910,31 +1917,38 @@ def extract_check_images(file_path, temp_dir, use_history=True, client_history_f
 
         if not payee and order_y:
             for avg_y, line_words in check_lines:
-                if abs(avg_y - order_y) <= 35 and avg_y != order_y:
+                if abs(avg_y - order_y) <= 45 and avg_y != order_y:
                     line_text = ' '.join(w['text'] for w in line_words).strip()
                     line_upper = line_text.upper()
-                    if not any(k in line_upper for k in ['DATE', 'DOLLARS', 'SEVENTY', 'CHECK', 'WELLS', 'BANK', 'FOR', 'MEMO']):
-                        t_list = [w['text'] for w in line_words if 200 < w['center_x'] < 700 and w['text'] not in ['$', '=', '%', '/', '.']]
+                    if not any(k in line_upper for k in ['DATE', 'DOLLARS', 'SEVENTY', 'CHECK', 'FOR', 'MEMO']):
+                        t_list = []
+                        for w in line_words:
+                            w_up = w['text'].upper()
+                            if w_up in ['TO', 'THE', 'PAY', 'ORDER', 'OF']:
+                                continue
+                            if w['text'] in ['$', '=', '%', '/', '.'] or re.match(r'^\$?\d+(?:,\d{3})*(?:\.\d{2})?$', w['text']):
+                                continue
+                            t_list.append(w['text'])
                         if t_list:
                             payee = ' '.join(t_list).strip()
                             break
 
-        if not payee and for_payee:
-            payee = for_payee
+        if not payee:
+            payee = for_payee or business_name
 
         # 4. Extract Amount
         amount = None
-        amt_match = re.search(r'Check\s*Amount\s*\$?\s*(\d+(?:\.\d{2})?)', full_str, re.IGNORECASE)
+        amt_match = re.search(r'Check\s*Amount\s*\$?\s*([\d,]+(?:\.\d{2})?)', full_str, re.IGNORECASE)
         if amt_match:
             try:
-                amount = float(amt_match.group(1))
+                amount = float(amt_match.group(1).replace(',', ''))
             except ValueError:
                 pass
         if amount is None:
-            amt_match2 = re.search(r'\$\s*(\d+\.\d{2})', full_str)
+            amt_match2 = re.search(r'\$\s*([\d,]+\.\d{2})', full_str)
             if amt_match2:
                 try:
-                    amount = float(amt_match2.group(1))
+                    amount = float(amt_match2.group(1).replace(',', ''))
                 except ValueError:
                     pass
 
