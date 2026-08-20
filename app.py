@@ -1895,7 +1895,8 @@ async def process_check_pdf(
             use_history=use_history, 
             client_history_fetcher=get_client_history_rules, 
             parent_name=user_parent,
-            client_name=client_name
+            client_name=client_name,
+            original_filename=file.filename
         )
         background_tasks.add_task(cleanup_temp_dir, temp_dir)
         return check_data
