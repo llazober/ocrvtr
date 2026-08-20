@@ -1828,33 +1828,17 @@ def extract_check_images(file_path, temp_dir, use_history=True, client_history_f
 
         check_lines = group_words_to_lines(check_region_words)
 
-        # 1. Extract Check Number
+        # 1. Extract Check Number (Prioritize original filename, then explicit OCR header)
         check_number = None
-        header_match = re.search(r'Check\s*(?:Number|Num|#)?\s*[:#]?\s*(\d{3,8})\b', full_str, re.IGNORECASE)
-        if header_match:
-            check_number = header_match.group(1)
-
-        if not check_number:
-            top_right_words = [
-                w for w in check_region_words 
-                if w['center_x'] > (0.6 * max_x) and w['center_y'] < (0.65 * max_y)
-            ]
-            for w in sorted(top_right_words, key=lambda x: x['center_y']):
-                if re.match(r'^\d{3,8}$', w['text'].strip()):
-                    check_number = w['text'].strip()
-                    break
-
-        # Fallback: Extract from filename when OCR top-right fails and Bank is Wells Fargo
-        is_wells_fargo = (
-            'wells fargo' in full_str.lower() or 
-            'wells' in full_str.lower() or 
-            re.search(r'wells\s*f(?:ar|ra)go', filename_to_check, re.IGNORECASE) is not None
-        )
-
-        if not check_number and is_wells_fargo:
+        if filename_to_check:
             fn_match = re.search(r'(?:CHECK|CHK)?\s*#?\s*(\d{3,8})\b', filename_to_check, re.IGNORECASE)
             if fn_match and fn_match.group(1):
                 check_number = fn_match.group(1)
+
+        if not check_number:
+            header_match = re.search(r'Check\s*(?:Number|Num|#)?\s*[:#]?\s*(\d{3,8})\b', full_str, re.IGNORECASE)
+            if header_match:
+                check_number = header_match.group(1)
 
         # 2. Extract Business Name (Top-left of check scan area)
         business_name = None
