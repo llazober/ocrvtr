@@ -1861,6 +1861,9 @@ async def process_check_pdf(
     request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    use_history: bool = Form(True),
+    parent_name: str = Form(None),
+    client_name: str = Form(None),
 ):
     username = get_current_username(request)
     if not username:
@@ -1874,6 +1877,8 @@ async def process_check_pdf(
     if ext not in [".pdf", ".png", ".jpg", ".jpeg"]:
         raise HTTPException(status_code=400, detail="Only PDF and image files (.png, .jpg, .jpeg) are supported.")
 
+    user_parent = parent_name or get_user_parent_name(username)
+
     temp_dir = tempfile.mkdtemp()
     check_file_path = os.path.join(temp_dir, f"input_check{ext}")
     try:
@@ -1884,7 +1889,14 @@ async def process_check_pdf(
         raise HTTPException(status_code=500, detail=f"Failed to save uploaded check file: {e}")
 
     try:
-        check_data = extract_check_images(check_file_path, temp_dir)
+        check_data = extract_check_images(
+            check_file_path, 
+            temp_dir, 
+            use_history=use_history, 
+            client_history_fetcher=get_client_history_rules, 
+            parent_name=user_parent,
+            client_name=client_name
+        )
         background_tasks.add_task(cleanup_temp_dir, temp_dir)
         return check_data
     except Exception as e:

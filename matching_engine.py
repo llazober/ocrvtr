@@ -30,7 +30,8 @@ def normalize_description(raw_desc: str) -> str:
     fillers = [
         r'\bCHECKCARD\b', r'\bCKCD\b', r'\bPURCHASE\b', r'\bPOS\b', r'\bDES:\b', 
         r'\bID:\b', r'\bDEPOSIT\b', r'\bWITHDRAWAL\b', r'\bTRANSFER\b', r'\bRECURRING\b',
-        r'\bONLINE\b', r'\bPAYMENT\b', r'\bPREAUTHORIZED\b', r'\bCONF\b', r'\bREF\b', r'\bGJ\b'
+        r'\bONLINE\b', r'\bPAYMENT\b', r'\bPREAUTHORIZED\b', r'\bCONF\b', r'\bREF\b', r'\bGJ\b',
+        r'\bCHECK\b', r'\bCHK\b', r'\bPAID\b'
     ]
     for f in fillers:
         text = re.sub(f, ' ', text, flags=re.IGNORECASE)
@@ -121,11 +122,13 @@ def match_gl_account(
         if any(k in raw_upper for k in ["SQUARE", "STRIPE", "CLOVER", "TOAST", "SHOPIFY", "MERCHANT"]):
             return ("4000", "Merchant Sales Income", 0.85)
     else:
-        # Check matching: "CHECK", "CHECK #", "CHECK 1234" -> default_withdrawal (500/656)
-        if "CHECK" in raw_upper or raw_upper.startswith("CHECK"):
+        # Check matching: ONLY if description is generic check text without specific vendor words
+        if re.fullmatch(r'^(?:CHECK|CHK|CHECK\s*CARD|CHECK\s*PAID|CKCD|PAID\s*CHECK)(?:\s*#?\s*\d+)?$', raw_upper.strip()):
             return (default_withdrawal, "Check Payment", 0.85)
 
         # Expenses / Withdrawals with known vendor keywords
+        if any(k in raw_upper for k in ["SANDEZ", "TRANSPORT", "FREIGHT", "TRUCKING", "LOGISTICS", "CARRIER", "SHIPPING", "EXPRESS", "DELIVERY"]):
+            return ("481", "Transportation Service", 0.85)
         if any(k in raw_upper for k in ["FORD", "CHEVROLET", "AUTOZONE", "ADVANCE AUTO", "NAPA", "TIRE", "AUTOMOTIVE", "MOTORS", "CAR WASH", "AUTO"]):
             return ("725", "Auto & Vehicle Expense", 0.85)
         if any(k in raw_upper for k in ["SHELL", "CHEVRON", "EXXON", "MOBIL", "BP ", "MARATHON", "WAWA", "RACETRAC", "7-ELEVEN", "GAS STATION", "FUEL"]):

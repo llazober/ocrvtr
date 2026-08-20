@@ -1663,6 +1663,19 @@
                 return;
             }
 
+            // Pre-fetch history rules if not loaded yet
+            if (!currentHistoryRecords || currentHistoryRecords.length === 0) {
+                try {
+                    const clientSelect = document.getElementById('historyClientSelect');
+                    const clientName = clientSelect ? clientSelect.value.trim() : (currentResult.business_name || 'DEFAULT');
+                    const res = await fetch(`/api/clients/history?clientName=${encodeURIComponent(clientName)}&parentName=${encodeURIComponent(CURRENT_PARENT_NAME)}`);
+                    const data = await res.json();
+                    if (data.historyRules) currentHistoryRecords = data.historyRules;
+                } catch (e) {
+                    console.warn('Could not pre-fetch history rules for check matching:', e);
+                }
+            }
+
             let totalUpdatedCount = 0;
             let processedFilesCount = 0;
             let allExtractedChecks = [];
@@ -1674,6 +1687,12 @@
 
                     const formData = new FormData();
                     formData.append('file', file);
+                    const useHistoryChecked = document.getElementById('useHistoryGlCheckbox')?.checked || true;
+                    formData.append('use_history', useHistoryChecked ? 'true' : 'false');
+                    formData.append('parent_name', CURRENT_PARENT_NAME);
+                    if (currentResult.business_name) {
+                        formData.append('client_name', currentResult.business_name);
+                    }
 
                     try {
                         const response = await fetch('/process-checks', {
@@ -1704,20 +1723,50 @@
                                     // Update transaction description
                                     tx.description = payee;
 
-                                    // Auto-remap GL Account code for known vendor categories
-                                    const lowerPayee = payee.toLowerCase();
-                                    if (lowerPayee.includes('comcast') || lowerPayee.includes('xfinity') || lowerPayee.includes('att') || lowerPayee.includes('fpl') || lowerPayee.includes('verizon') || lowerPayee.includes('t-mobile') || lowerPayee.includes('utility')) {
-                                        tx.account = "795";
-                                        tx.account_name = "Utilities & Telecom";
-                                        tx.match_source = "Matched";
-                                    } else if (lowerPayee.includes('home depot') || lowerPayee.includes('lowes') || lowerPayee.includes('hardware') || lowerPayee.includes('repair')) {
-                                        tx.account = "778";
-                                        tx.account_name = "Repairs & Maintenance";
-                                        tx.match_source = "Matched";
-                                    } else if (lowerPayee.includes('publix') || lowerPayee.includes('walmart') || lowerPayee.includes('target') || lowerPayee.includes('costco') || lowerPayee.includes('supplies')) {
-                                        tx.account = "782";
-                                        tx.account_name = "Supplies & Provisions";
-                                        tx.match_source = "Matched";
+                                    // GL Account re-mapping from backend history match or client history rules
+                                    if (chk.account && (chk.match_source === 'Matched' || chk.match_confidence > 0)) {
+                                        tx.account = chk.account;
+                                        tx.account_name = chk.account_name || "Mapped Account";
+                                        tx.match_source = chk.match_source || "Matched";
+                                    } else {
+                                        let historyMatched = false;
+                                        if (currentHistoryRecords && currentHistoryRecords.length > 0) {
+                                            const cleanPayee = payee.toUpperCase().trim();
+                                            for (const rule of currentHistoryRecords) {
+                                                const pattern = (rule.pattern || '').toUpperCase().trim();
+                                                const acctNum = (rule.accountNumber || '').trim();
+                                                if (!pattern || !acctNum) continue;
+
+                                                if (cleanPayee === pattern || cleanPayee.includes(pattern) || pattern.includes(cleanPayee)) {
+                                                    tx.account = acctNum;
+                                                    tx.account_name = rule.accountName || "Mapped Account";
+                                                    tx.match_source = "Matched";
+                                                    historyMatched = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        if (!historyMatched) {
+                                            const lowerPayee = payee.toLowerCase();
+                                            if (lowerPayee.includes('sandez') || lowerPayee.includes('transport') || lowerPayee.includes('freight') || lowerPayee.includes('trucking') || lowerPayee.includes('logistics')) {
+                                                tx.account = "481";
+                                                tx.account_name = "Transportation Service";
+                                                tx.match_source = "Matched";
+                                            } else if (lowerPayee.includes('comcast') || lowerPayee.includes('xfinity') || lowerPayee.includes('att') || lowerPayee.includes('fpl') || lowerPayee.includes('verizon') || lowerPayee.includes('t-mobile') || lowerPayee.includes('utility')) {
+                                                tx.account = "795";
+                                                tx.account_name = "Utilities & Telecom";
+                                                tx.match_source = "Matched";
+                                            } else if (lowerPayee.includes('home depot') || lowerPayee.includes('lowes') || lowerPayee.includes('hardware') || lowerPayee.includes('repair')) {
+                                                tx.account = "778";
+                                                tx.account_name = "Repairs & Maintenance";
+                                                tx.match_source = "Matched";
+                                            } else if (lowerPayee.includes('publix') || lowerPayee.includes('walmart') || lowerPayee.includes('target') || lowerPayee.includes('costco') || lowerPayee.includes('supplies')) {
+                                                tx.account = "782";
+                                                tx.account_name = "Supplies & Provisions";
+                                                tx.match_source = "Matched";
+                                            }
+                                        }
                                     }
 
                                     totalUpdatedCount++;

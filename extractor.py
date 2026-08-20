@@ -1788,13 +1788,26 @@ def group_words_to_lines(words, y_tol=10):
         result.append((avg_y, sorted_line))
     return sorted(result, key=lambda x: x[0])
 
-def extract_check_images(file_path, temp_dir):
+def extract_check_images(file_path, temp_dir, use_history=True, client_history_fetcher=None, parent_name=None, client_name=None):
     ext = os.path.splitext(file_path.lower())[1]
     if ext in ['.png', '.jpg', '.jpeg']:
         png_paths = [file_path]
     else:
         png_paths = convert_pdf_to_png(file_path, temp_dir)
     client = get_vision_client()
+
+    history_rules = []
+    if use_history and client_history_fetcher:
+        try:
+            import inspect
+            sig = inspect.signature(client_history_fetcher)
+            if len(sig.parameters) >= 2:
+                history_rules = client_history_fetcher(client_name or "DEFAULT", parent_name)
+            else:
+                history_rules = client_history_fetcher(client_name or "DEFAULT")
+            print(f"--> [CHECK GL MATCHING] Loaded {len(history_rules)} rules for '{client_name or 'DEFAULT'}' (Parent: '{parent_name}')")
+        except Exception as e:
+            print(f"--> [CHECK GL MATCHING] Error fetching history rules: {e}")
 
     extracted_checks = []
 
@@ -1912,11 +1925,30 @@ def extract_check_images(file_path, temp_dir):
                 except ValueError:
                     pass
 
+        # 5. GL Account Matching for Check Payee
+        acct_num, acct_name, conf = None, None, 0.0
+        match_src = "Default"
+        check_desc = payee or for_payee or business_name
+        if check_desc:
+            acct_num, acct_name, conf = match_gl_account(
+                raw_desc=check_desc,
+                history_rules=history_rules,
+                default_deposit="260",
+                default_withdrawal="500",
+                is_deposit=False
+            )
+            if conf > 0:
+                match_src = "Matched"
+
         extracted_checks.append({
             'check_number': check_number,
             'payee': payee or for_payee,
             'business_name': business_name,
-            'amount': amount
+            'amount': amount,
+            'account': acct_num,
+            'account_name': acct_name,
+            'match_confidence': conf,
+            'match_source': match_src
         })
 
     return {
