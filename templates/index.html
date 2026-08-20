@@ -1716,16 +1716,25 @@
                             const payee = (chk.payee || chk.business_name || '').trim();
 
                             currentResult.transactions.forEach(tx => {
-                                const rawTxCheckNum = String(tx.checknumber || tx.check_number || tx.reference || tx.Reference || '').trim();
-                                const txCheckNumNorm = rawTxCheckNum.replace(/^0+/, '');
-                                const txDesc = String(tx.description || '').trim();
+                                const allTxNums = [
+                                    String(tx.checknumber || ''),
+                                    String(tx.check_number || ''),
+                                    String(tx.checkNo || ''),
+                                    String(tx.check_no || ''),
+                                    String(tx.reference || ''),
+                                    String(tx.Reference || ''),
+                                    String(tx.ref || ''),
+                                    String(tx.description || '')
+                                ].join(' ');
+
+                                const extractedNums = allTxNums.match(/\b\d{3,8}\b/g) || [];
+                                const normalizedNums = extractedNums.map(n => n.replace(/^0+/, ''));
 
                                 const matchesCheckNum = 
-                                    (txCheckNumNorm && txCheckNumNorm === targetNorm) ||
-                                    (rawTxCheckNum && rawTxCheckNum === targetNum) ||
-                                    (targetNum && txDesc.includes(targetNum)) ||
-                                    (targetNorm && txDesc.includes(targetNorm)) ||
-                                    (txDesc.toUpperCase().includes('CHECK') && (txCheckNumNorm === targetNorm || !rawTxCheckNum));
+                                    extractedNums.includes(targetNum) ||
+                                    normalizedNums.includes(targetNorm) ||
+                                    allTxNums.includes(targetNum) ||
+                                    (targetNorm && allTxNums.includes(targetNorm));
 
                                 if (matchesCheckNum) {
                                     // Update transaction description if payee/business name extracted

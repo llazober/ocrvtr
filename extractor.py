@@ -1918,6 +1918,13 @@ def extract_check_images(file_path, temp_dir, use_history=True, client_history_f
                             break
 
         if not payee:
+            if filename_to_check:
+                fn_payee_match = re.search(r'(?:CHECK|CHK)?\s*#?\s*\d{3,8}\s*[-–_]\s*(.+?)(?:\.[a-z0-9]{3,4})?$', filename_to_check, re.IGNORECASE)
+                if fn_payee_match and fn_payee_match.group(1):
+                    clean_fn_payee = fn_payee_match.group(1).strip()
+                    if clean_fn_payee.lower() not in ['pdf', 'png', 'jpg', 'jpeg']:
+                        payee = clean_fn_payee
+        if not payee:
             payee = for_payee or business_name
 
         # 4. Extract Amount
