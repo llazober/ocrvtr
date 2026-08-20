@@ -1754,9 +1754,13 @@
                                             for (const rule of currentHistoryRecords) {
                                                 const pattern = (rule.pattern || '').toUpperCase().trim();
                                                 const acctNum = (rule.accountNumber || '').trim();
-                                                if (!pattern || !acctNum) continue;
+                                                
+                                                const isPatternMatch = 
+                                                    (cleanPayee === pattern) ||
+                                                    (pattern.length >= 3 && cleanPayee.includes(pattern)) ||
+                                                    (pattern.length >= 2 && new RegExp('\\b' + pattern.replace(/[^A-Z0-9]/g, '') + '\\b', 'i').test(cleanPayee));
 
-                                                if (cleanPayee === pattern || cleanPayee.includes(pattern) || pattern.includes(cleanPayee)) {
+                                                if (isPatternMatch) {
                                                     tx.account = acctNum;
                                                     tx.account_name = rule.accountName || "Mapped Account";
                                                     tx.match_source = "Matched";
