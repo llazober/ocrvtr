@@ -1712,23 +1712,33 @@
                         checks.forEach(chk => {
                             if (!chk.check_number) return;
                             const targetNum = String(chk.check_number).trim();
-                            const payee = (chk.payee || '').trim();
-                            if (!payee) return;
+                            const targetNorm = targetNum.replace(/^0+/, '');
+                            const payee = (chk.payee || chk.business_name || '').trim();
 
                             currentResult.transactions.forEach(tx => {
-                                const txCheckNum = String(tx.checknumber || '').trim();
+                                const rawTxCheckNum = String(tx.checknumber || tx.check_number || tx.reference || tx.Reference || '').trim();
+                                const txCheckNumNorm = rawTxCheckNum.replace(/^0+/, '');
                                 const txDesc = String(tx.description || '').trim();
 
-                                if (txCheckNum === targetNum || txDesc.includes(targetNum) || (txDesc.toUpperCase().includes('CHECK') && (txCheckNum === targetNum || !txCheckNum))) {
-                                    // Update transaction description
-                                    tx.description = payee;
+                                const matchesCheckNum = 
+                                    (txCheckNumNorm && txCheckNumNorm === targetNorm) ||
+                                    (rawTxCheckNum && rawTxCheckNum === targetNum) ||
+                                    (targetNum && txDesc.includes(targetNum)) ||
+                                    (targetNorm && txDesc.includes(targetNorm)) ||
+                                    (txDesc.toUpperCase().includes('CHECK') && (txCheckNumNorm === targetNorm || !rawTxCheckNum));
+
+                                if (matchesCheckNum) {
+                                    // Update transaction description if payee/business name extracted
+                                    if (payee) {
+                                        tx.description = payee;
+                                    }
 
                                     // GL Account re-mapping from backend history match or client history rules
                                     if (chk.account && (chk.match_source === 'Matched' || chk.match_confidence > 0)) {
                                         tx.account = chk.account;
                                         tx.account_name = chk.account_name || "Mapped Account";
                                         tx.match_source = chk.match_source || "Matched";
-                                    } else {
+                                    } else if (payee) {
                                         let historyMatched = false;
                                         if (currentHistoryRecords && currentHistoryRecords.length > 0) {
                                             const cleanPayee = payee.toUpperCase().trim();
@@ -1784,7 +1794,7 @@
                     showAlert(`Successfully processed ${processedFilesCount} check document(s) and matched/updated ${totalUpdatedCount} check transaction(s)!`, 'success');
                 } else if (allExtractedChecks.length > 0) {
                     const checkNumbers = allExtractedChecks.map(c => c.check_number).filter(Boolean).join(', ');
-                    showAlert(`Processed ${processedFilesCount} check document(s) and extracted payee details, but could not find matching check numbers (${checkNumbers}) in the current transactions table.`, 'error');
+                    showAlert(`Processed ${processedFilesCount} check document(s) and extracted check details (${checkNumbers}), but could not find matching check numbers in the current transactions table.`, 'error');
                 } else {
                     showAlert(`Processed ${processedFilesCount} check document(s), but no check details could be extracted.`, 'error');
                 }
