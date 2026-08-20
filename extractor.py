@@ -1828,9 +1828,19 @@ def extract_check_images(file_path, temp_dir, use_history=True, client_history_f
 
         check_lines = group_words_to_lines(check_region_words)
 
-        # 1. Extract Check Number (Prioritize original filename, then explicit OCR header)
+        # 1. Extract Check Number (Prioritize top header row on image, fallback to filename)
         check_number = None
-        if filename_to_check:
+        all_document_lines = group_words_to_lines(words)
+        for y, line_words in all_document_lines:
+            line_str = ' '.join(w['text'] for w in line_words).strip()
+            line_upper = line_str.upper()
+            if 'CHECK' in line_upper and ('NUMBER' in line_upper or 'NUM' in line_upper or '#' in line_upper or 'NO' in line_upper):
+                nums = re.findall(r'\b\d{3,8}\b', line_str)
+                if nums:
+                    check_number = nums[-1]
+                    break
+
+        if not check_number and filename_to_check:
             fn_match = re.search(r'(?:CHECK|CHK)?\s*#?\s*(\d{3,8})\b', filename_to_check, re.IGNORECASE)
             if fn_match and fn_match.group(1):
                 check_number = fn_match.group(1)
