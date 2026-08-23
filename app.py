@@ -1,4 +1,13 @@
 import os
+# Updated server routes & templates - fixed HTML string escaping for customer names
+
+
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 import time
 import secrets
 import shutil
@@ -6,19 +15,61 @@ import tempfile
 import base64
 import json
 import urllib.request
+import urllib.parse
 import urllib.error
 import hashlib
 import hmac
 import psycopg2
+import email.utils
+import re
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, File, UploadFile, BackgroundTasks, Form, Cookie
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from fastapi.exceptions import HTTPException
+import traceback
 from extractor import run_extraction, extract_check_images
 
 app = FastAPI(title="Bank Statement OCR Extractor")
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"[UNHANDLED EXCEPTION]: {exc}")
+    traceback.print_exc()
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Internal Server Error: {str(exc)}"}
+        )
+    return HTMLResponse(
+        status_code=500,
+        content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Internal Server Error - Datalazo CRM</title>
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+                .card {{ background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 40px; max-width: 500px; width: 90%; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }}
+                h1 {{ color: #f43f5e; margin-top: 0; font-size: 24px; }}
+                p {{ color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }}
+                .btn {{ background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; text-decoration: none; cursor: pointer; display: inline-block; }}
+                .btn:hover {{ background: #2563eb; }}
+                .err-box {{ background: #0f172a; border: 1px solid #334155; color: #f87171; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; text-align: left; overflow-x: auto; margin-bottom: 20px; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>Something Went Wrong</h1>
+                <p>An internal server error occurred while processing your request. Please try reloading or returning to the dashboard.</p>
+                <div class="err-box">{str(exc)}</div>
+                <a href="/dashboard" class="btn">Reload Dashboard</a>
+            </div>
+        </body>
+        </html>
+        """
+    )
 
 # ── Auth config ────────────────────────────────────────────────────────────────
 APP_USERNAME = os.environ.get("APP_USERNAME", "admin@vrtservices12.com")
@@ -51,6 +102,19 @@ def load_config() -> dict:
     return {}
 
 APP_CONFIG = load_config()
+
+def parse_clean_email(email_str: str) -> str:
+    """Extract clean, raw email address from potential RFC email header strings e.g. 'John <john@domain.com>' -> 'john@domain.com'."""
+    if not email_str:
+        return ""
+    s = str(email_str).strip().strip('\'"')
+    name, addr = email.utils.parseaddr(s)
+    if addr and "@" in addr:
+        return addr.strip()
+    match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', s)
+    if match:
+        return match.group(0).strip()
+    return s
 
 # Session tracking:
 # valid_sessions: token -> {"username": str}
@@ -271,6 +335,421 @@ def get_db_connection():
     if not db_url:
         db_url = "postgresql://postgres:Paris2025%24@161.35.119.223:5432/datalazo?sslmode=disable"
     return psycopg2.connect(db_url)
+
+def sync_customer_parent_mapping(cur, parent_name: str, legal_name: str, display_name: str = None):
+    """Ensure parent-client mapping exists in ParentClientMap using legal_name under parent_name."""
+    if not parent_name or not parent_name.strip() or not legal_name or not legal_name.strip():
+        return
+    import uuid
+    p_name = parent_name.strip()
+    l_name = legal_name.strip()
+
+    cur.execute('''
+        INSERT INTO "ParentClientMap" ("id", "parentName", "clientName", "createdAt", "updatedAt")
+        VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT ("parentName", "clientName")
+        DO UPDATE SET "updatedAt" = CURRENT_TIMESTAMP;
+    ''', (str(uuid.uuid4()), p_name, l_name))
+
+def init_customer_table():
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS customer (
+                    id              BIGSERIAL PRIMARY KEY,
+                    custumer_number VARCHAR(30) UNIQUE NOT NULL,
+                    customer_type   VARCHAR(20) NOT NULL,
+                    legal_name      VARCHAR(200) NOT NULL,
+                    display_name    VARCHAR(200),
+                    tax_id          VARCHAR(50),
+                    status          VARCHAR(30) NOT NULL DEFAULT 'Active',
+                    assigned_user_id BIGINT,
+                    phone           VARCHAR(50),
+                    email           VARCHAR(200),
+                    website         VARCHAR(300),
+                    notes           TEXT,
+                    parent_name     VARCHAR(200),
+                    do_folder_path  VARCHAR(300),
+                    do_storage_status VARCHAR(50),
+                    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                ALTER TABLE customer ADD COLUMN IF NOT EXISTS parent_name VARCHAR(200);
+                ALTER TABLE customer ADD COLUMN IF NOT EXISTS do_folder_path VARCHAR(300);
+                ALTER TABLE customer ADD COLUMN IF NOT EXISTS do_storage_status VARCHAR(50);
+                UPDATE customer SET parent_name = 'VRT Services' WHERE parent_name IS NULL OR parent_name = '';
+
+                CREATE TABLE IF NOT EXISTS "ParentClientMap" (
+                    "id"          VARCHAR(100) PRIMARY KEY,
+                    "parentName"  VARCHAR(200) NOT NULL,
+                    "clientName"  VARCHAR(200) NOT NULL,
+                    "createdAt"   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    "updatedAt"   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS "ParentClientMap_parentName_clientName_key" ON "ParentClientMap" ("parentName", "clientName");
+            """)
+
+            # Backfill ParentClientMap for existing customer records
+            try:
+                cur.execute("SELECT parent_name, legal_name, display_name FROM customer WHERE parent_name IS NOT NULL AND parent_name != '';")
+                customers_to_map = cur.fetchall() or []
+                for p_name, l_name, d_name in customers_to_map:
+                    sync_customer_parent_mapping(cur, p_name, l_name, d_name)
+            except Exception as backfill_err:
+                print(f"Warning: Backfill parent-client mappings failed: {backfill_err}")
+
+            conn.commit()
+            print("Customer table initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing customer table: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+def init_checklist_table():
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS customer_task_checklist (
+                    id                                 BIGSERIAL PRIMARY KEY,
+                    customer_id                        BIGINT REFERENCES customer(id) ON DELETE CASCADE,
+                    period                             VARCHAR(20) NOT NULL,
+                    bank_statement_received            BOOLEAN NOT NULL DEFAULT FALSE,
+                    check_images_received              BOOLEAN NOT NULL DEFAULT FALSE,
+                    extraction_ai_categorization_done  BOOLEAN NOT NULL DEFAULT FALSE,
+                    accountant_reviewed               BOOLEAN NOT NULL DEFAULT FALSE,
+                    tax_docs_requested                 BOOLEAN NOT NULL DEFAULT FALSE,
+                    tax_docs_received                  BOOLEAN NOT NULL DEFAULT FALSE,
+                    tax_organizer                      BOOLEAN NOT NULL DEFAULT FALSE,
+                    tax_preparation                    BOOLEAN NOT NULL DEFAULT FALSE,
+                    tax_review                         BOOLEAN NOT NULL DEFAULT FALSE,
+                    tax_client_signature               BOOLEAN NOT NULL DEFAULT FALSE,
+                    tax_efile                          BOOLEAN NOT NULL DEFAULT FALSE,
+                    tax_accepted                       BOOLEAN NOT NULL DEFAULT FALSE,
+                    notes                              TEXT,
+                    tax_notes                          TEXT,
+                    created_at                         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at                         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(customer_id, period)
+                );
+                ALTER TABLE customer_task_checklist ADD COLUMN IF NOT EXISTS tax_docs_requested BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE customer_task_checklist ADD COLUMN IF NOT EXISTS tax_docs_received BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE customer_task_checklist ADD COLUMN IF NOT EXISTS tax_organizer BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE customer_task_checklist ADD COLUMN IF NOT EXISTS tax_preparation BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE customer_task_checklist ADD COLUMN IF NOT EXISTS tax_review BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE customer_task_checklist ADD COLUMN IF NOT EXISTS tax_client_signature BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE customer_task_checklist ADD COLUMN IF NOT EXISTS tax_efile BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE customer_task_checklist ADD COLUMN IF NOT EXISTS tax_accepted BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE customer_task_checklist ADD COLUMN IF NOT EXISTS tax_notes TEXT;
+            """)
+            conn.commit()
+            print("Customer task checklist table initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing customer task checklist table: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+def init_communications_table():
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS customer_communications (
+                    id                BIGSERIAL PRIMARY KEY,
+                    customer_id       BIGINT REFERENCES customer(id) ON DELETE CASCADE,
+                    direction         VARCHAR(10) NOT NULL,
+                    sender_email      VARCHAR(200) NOT NULL,
+                    recipient_email   VARCHAR(200) NOT NULL,
+                    reply_to_email    VARCHAR(200),
+                    subject           VARCHAR(300),
+                    body_text         TEXT,
+                    attachments_json  JSONB DEFAULT '[]'::jsonb,
+                    status            VARCHAR(20) DEFAULT 'DELIVERED',
+                    is_read           BOOLEAN DEFAULT FALSE,
+                    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                ALTER TABLE customer_communications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
+            """)
+            conn.commit()
+            print("Customer communications table initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing customer communications table: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+try:
+    init_customer_table()
+    init_checklist_table()
+    init_communications_table()
+except Exception as e:
+    print(f"Startup table init exception: {e}")
+
+def extract_period_from_key(key_str: str) -> str:
+    """
+    Extracts YYYY-MM period from S3 key or folder path.
+    Recognizes:
+    - '2026/April' or '2026/Apr' or 'Year 2026/Apr' -> '2026-04'
+    - '2026-04' or '2026_04' or '2026/04' -> '2026-04'
+    - 'April 2026' or 'Apr 2026' -> '2026-04'
+    """
+    if not key_str:
+        import datetime
+        return datetime.datetime.now().strftime("%Y-%m")
+
+    import re
+    months_map = {
+        "jan": "01", "january": "01",
+        "feb": "02", "february": "02",
+        "mar": "03", "march": "03",
+        "apr": "04", "april": "04",
+        "may": "05",
+        "jun": "06", "june": "06",
+        "jul": "07", "july": "07",
+        "aug": "08", "august": "08",
+        "sep": "09", "september": "09", "sept": "09",
+        "oct": "10", "october": "10",
+        "nov": "11", "november": "11",
+        "dec": "12", "december": "12"
+    }
+
+    clean = key_str.replace("\\", "/")
+
+    # 1. Match YYYY-MM or YYYY_MM or YYYY/MM (e.g. 2026-07 or 2026/07)
+    m = re.search(r'\b(20\d{2})[\/\-_](0[1-9]|1[0-2])\b', clean)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}"
+
+    # 2. Match YYYY/MonthName or Year YYYY/MonthName (e.g. 2026/April, Year 2026/Apr)
+    m = re.search(r'\b(?:Year\s*)?(20\d{2})[\/\-_\s]+([a-zA-Z]{3,9})\b', clean, re.IGNORECASE)
+    if m:
+        year = m.group(1)
+        month_str = m.group(2).lower()
+        if month_str in months_map:
+            return f"{year}-{months_map[month_str]}"
+
+    # 3. Match MonthName YYYY (e.g. April 2026, Jul 2026)
+    m = re.search(r'\b([a-zA-Z]{3,9})[\/\-_\s]+(20\d{2})\b', clean, re.IGNORECASE)
+    if m:
+        month_str = m.group(1).lower()
+        year = m.group(2)
+        if month_str in months_map:
+            return f"{year}-{months_map[month_str]}"
+
+    import datetime
+    return datetime.datetime.now().strftime("%Y-%m")
+
+def update_customer_checklist_milestone(customer_id: int, period: str | None, milestone: str):
+    if not customer_id:
+        return
+    import datetime
+    if not period or not period.strip():
+        period = datetime.datetime.now().strftime("%Y-%m")
+
+    col_map = {
+        "statement_received": "bank_statement_received",
+        "checks_received": "check_images_received",
+        "extraction_done": "extraction_ai_categorization_done",
+        "accountant_reviewed": "accountant_reviewed",
+        "tax_docs_requested": "tax_docs_requested",
+        "tax_docs_received": "tax_docs_received",
+        "tax_organizer": "tax_organizer",
+        "tax_preparation": "tax_preparation",
+        "tax_review": "tax_review",
+        "tax_client_signature": "tax_client_signature",
+        "tax_efile": "tax_efile",
+        "tax_accepted": "tax_accepted"
+    }
+
+    target_col = col_map.get(milestone)
+    if not target_col:
+        return
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                INSERT INTO customer_task_checklist (customer_id, period, {target_col}, updated_at)
+                VALUES (%s, %s, TRUE, CURRENT_TIMESTAMP)
+                ON CONFLICT (customer_id, period)
+                DO UPDATE SET {target_col} = TRUE, updated_at = CURRENT_TIMESTAMP;
+            """, (customer_id, period))
+            conn.commit()
+    except Exception as e:
+        print(f"Error updating checklist milestone '{milestone}' for customer {customer_id}: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+# ── DigitalOcean Spaces Config & Storage Helpers ────────────────────────────────
+DO_SPACES_KEY      = os.environ.get("DO_SPACES_KEY", "DO8014EY6DYN3XCKFU7Q")
+DO_SPACES_SECRET   = os.environ.get("DO_SPACES_SECRET", "76Uy6ejEwtyWbuBfv9pWdWVUtCt7KW7yEBJxaqLI6XY")
+DO_SPACES_ENDPOINT = os.environ.get("DO_SPACES_ENDPOINT", "https://nyc3.digitaloceanspaces.com")
+DO_SPACES_BUCKET   = os.environ.get("DO_SPACES_BUCKET", "datalazocrm")
+DO_SPACES_REGION   = os.environ.get("DO_SPACES_REGION", "nyc3")
+
+def get_s3_client():
+    key = os.environ.get("DO_SPACES_KEY") or DO_SPACES_KEY
+    secret = os.environ.get("DO_SPACES_SECRET") or DO_SPACES_SECRET
+    endpoint = os.environ.get("DO_SPACES_ENDPOINT") or DO_SPACES_ENDPOINT
+    region = os.environ.get("DO_SPACES_REGION") or DO_SPACES_REGION
+
+    if not secret:
+        print("[DO SPACES] Warning: DO_SPACES_SECRET is empty. Please set environment variable DO_SPACES_SECRET.")
+        return None, "DO_SPACES_SECRET environment variable is missing"
+
+    try:
+        import boto3
+        session = boto3.session.Session()
+        client = session.client(
+            's3',
+            region_name=region,
+            endpoint_url=endpoint,
+            aws_access_key_id=key,
+            aws_secret_access_key=secret
+        )
+        return client, None
+    except Exception as e:
+        print(f"[DO SPACES] Error creating boto3 S3 client: {e}")
+        return None, str(e)
+
+def sanitize_folder_name(name: str) -> str:
+    """Sanitizes customer name for folder path, stripping invalid characters while keeping human readability."""
+    if not name:
+        return "Unnamed_Customer"
+    cleaned = name.strip()
+    cleaned = cleaned.replace('/', '-').replace('\\', '-')
+    return cleaned
+
+def get_customer_root_folder_path(cust: dict) -> str:
+    """Returns stored do_folder_path or fallback path including parent_name if present."""
+    if cust and cust.get("do_folder_path"):
+        return cust["do_folder_path"]
+    p_name = (cust.get("parent_name") if cust else "") or ""
+    c_name = (cust.get("legal_name") if cust else "") or ""
+    if p_name and p_name.strip():
+        return f"{sanitize_folder_name(p_name)}/{sanitize_folder_name(c_name)}/"
+    return f"{sanitize_folder_name(c_name)}/"
+
+def init_customer_do_folders(customer_id: int, legal_name: str, year: int = None, parent_name: str = None, customer_type: str = None) -> tuple[bool, str, list[str]]:
+    """
+    Creates folder structure in DigitalOcean Spaces for a customer:
+    If customer_type is 'Individual':
+      <Parent Name>/<Customer Name>/
+        Tax Documents/
+          Tax Year <YYYY>/
+          Tax Year <YYYY-1>/
+    If customer_type is 'Business' (default):
+      <Parent Name>/<Customer Name>/
+        Bank Statements/
+          Year <YYYY>/
+        Check Images/
+          Year <YYYY>/
+            Jan/ ... Dec/
+        Tax Documents/
+          Tax Year <YYYY>/
+    Returns (success, root_folder_path, list_of_created_folders).
+    """
+    import datetime
+    if not year:
+        year = datetime.datetime.now().year
+
+    if customer_id and (not parent_name or not customer_type):
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT parent_name, customer_type FROM customer WHERE id = %s;", (customer_id,))
+                row = cur.fetchone()
+                if row:
+                    if not parent_name and row[0]: parent_name = row[0]
+                    if not customer_type and row[1]: customer_type = row[1]
+            conn.close()
+        except Exception as ex:
+            print(f"Warning: Could not fetch customer info for customer {customer_id}: {ex}")
+
+    clean_name = sanitize_folder_name(legal_name)
+    if parent_name and parent_name.strip():
+        clean_parent = sanitize_folder_name(parent_name)
+        root_path = f"{clean_parent}/{clean_name}/"
+    else:
+        root_path = f"{clean_name}/"
+
+    bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+
+    is_individual = customer_type and customer_type.strip().lower() == "individual"
+
+    if is_individual:
+        folders_to_create = [
+            root_path,
+            f"{root_path}Tax Documents/",
+            f"{root_path}Tax Documents/Tax Year {year}/",
+            f"{root_path}Tax Documents/Tax Year {year - 1}/",
+        ]
+    else:
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        folders_to_create = [
+            root_path,
+            f"{root_path}Bank Statements/",
+            f"{root_path}Bank Statements/Year {year}/",
+            f"{root_path}Check Images/",
+            f"{root_path}Check Images/Year {year}/",
+            f"{root_path}Tax Documents/",
+            f"{root_path}Tax Documents/Tax Year {year}/",
+        ]
+        for m in months:
+            folders_to_create.append(f"{root_path}Check Images/Year {year}/{m}/")
+
+    client, err_msg = get_s3_client()
+
+    if not client:
+        update_customer_storage_status(customer_id, root_path, "Pending Secret Key")
+        return False, root_path, [f"Notice: {err_msg}"]
+
+    created_folders = []
+    try:
+        for folder_key in folders_to_create:
+            client.put_object(
+                Bucket=bucket,
+                Key=folder_key,
+                Body=b'',
+                ACL='private'
+            )
+            created_folders.append(folder_key)
+
+        update_customer_storage_status(customer_id, root_path, "Initialized")
+        print(f"[DO SPACES] Successfully initialized {len(created_folders)} folders for '{legal_name}' (Parent: '{parent_name}') in bucket '{bucket}'")
+        return True, root_path, created_folders
+    except Exception as e:
+        error_detail = str(e)
+        print(f"[DO SPACES] Failed to create folders for '{legal_name}': {error_detail}")
+        update_customer_storage_status(customer_id, root_path, f"Error: {error_detail}")
+        return False, root_path, [f"Error: {error_detail}"]
+
+def update_customer_storage_status(customer_id: int, folder_path: str, status: str):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE customer SET
+                    do_folder_path = %s,
+                    do_storage_status = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s;
+            """, (folder_path, status, customer_id))
+            conn.commit()
+    except Exception as e:
+        print(f"Error updating customer storage status in DB: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def verify_password(password: str, stored_hash: str) -> bool:
     try:
@@ -718,33 +1197,44 @@ def refresh_qbo_tokens(refresh_token: str) -> dict | None:
         return None
 
 def get_valid_qbo_access_token(client_id_key: str) -> tuple[str | None, str | None]:
-    qbo_conn = get_qbo_connection(client_id_key)
-    if not qbo_conn:
+    try:
+        qbo_conn = get_qbo_connection(client_id_key)
+        if not qbo_conn:
+            return None, None
+
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        access_expires_at = qbo_conn.get("accessTokenExpiresAt")
+        
+        if access_expires_at:
+            if isinstance(access_expires_at, str):
+                try:
+                    access_expires_at = datetime.datetime.fromisoformat(access_expires_at.replace('Z', '+00:00'))
+                except Exception:
+                    access_expires_at = None
+
+            if access_expires_at and isinstance(access_expires_at, datetime.datetime):
+                if access_expires_at.tzinfo is None:
+                    now_compare = now.replace(tzinfo=None)
+                else:
+                    now_compare = now
+                    
+                if access_expires_at <= (now_compare + datetime.timedelta(minutes=5)):
+                    res = refresh_qbo_tokens(qbo_conn.get("refreshToken", ""))
+                    if res and "access_token" in res:
+                        new_access_token = res["access_token"]
+                        new_refresh_token = res.get("refresh_token", qbo_conn.get("refreshToken"))
+                        expires_in = res.get("expires_in", 3600)
+                        refresh_expires_in = res.get("x_refresh_token_expires_in", 8726400)
+                        save_qbo_connection(client_id_key, qbo_conn.get("realmId"), new_access_token, new_refresh_token, expires_in, refresh_expires_in)
+                        return new_access_token, qbo_conn.get("realmId")
+                    else:
+                        return None, None
+
+        return qbo_conn.get("accessToken"), qbo_conn.get("realmId")
+    except Exception as e:
+        print(f"Error checking QBO access token: {e}")
         return None, None
-
-    import datetime
-    now = datetime.datetime.now(datetime.timezone.utc)
-    access_expires_at = qbo_conn.get("accessTokenExpiresAt")
-    
-    if access_expires_at:
-        if access_expires_at.tzinfo is None:
-            now_compare = now.replace(tzinfo=None)
-        else:
-            now_compare = now
-            
-        if access_expires_at <= (now_compare + datetime.timedelta(minutes=5)):
-            res = refresh_qbo_tokens(qbo_conn["refreshToken"])
-            if res and "access_token" in res:
-                new_access_token = res["access_token"]
-                new_refresh_token = res.get("refresh_token", qbo_conn["refreshToken"])
-                expires_in = res.get("expires_in", 3600)
-                refresh_expires_in = res.get("x_refresh_token_expires_in", 8726400)
-                save_qbo_connection(client_id_key, qbo_conn["realmId"], new_access_token, new_refresh_token, expires_in, refresh_expires_in)
-                return new_access_token, qbo_conn["realmId"]
-            else:
-                return None, None
-
-    return qbo_conn["accessToken"], qbo_conn["realmId"]
 
 def fetch_qbo_chart_of_accounts(access_token: str, realm_id: str) -> list[dict]:
     import urllib.parse
@@ -918,7 +1408,7 @@ async def login_submit(
             site_host = get_request_host(request)
             record_login(username_clean, site_host, client_ip, user_agent)
             
-            response = RedirectResponse("/", status_code=302)
+            response = RedirectResponse("/dashboard", status_code=302)
             response.set_cookie(
                 key=COOKIE_NAME,
                 value=token,
@@ -952,7 +1442,7 @@ async def login_submit(
         site_host = get_request_host(request)
         record_login(username_clean, site_host, client_ip, user_agent)
         
-        response = RedirectResponse("/", status_code=302)
+        response = RedirectResponse("/dashboard", status_code=302)
         response.set_cookie(
             key=COOKIE_NAME,
             value=token,
@@ -996,105 +1486,1093 @@ async def logout(request: Request, reason: str = ""):
     response.delete_cookie(COOKIE_NAME)
     return response
 
-# ── Protected routes ───────────────────────────────────────────────────────────
-@app.get("/", response_class=HTMLResponse)
-async def read_index(request: Request, msg: str = "", error: str = ""):
-    username = get_current_username(request)
+def get_user_email(username: str) -> str:
+    """Fetch the email address for the logged in user or parent client organization."""
     if not username:
-        return RedirectResponse("/login", status_code=302)
-        
-    allowed, assigned_site = is_user_allowed_on_site(username, request)
-    if not allowed:
-        token = request.cookies.get(COOKIE_NAME)
-        if token:
-            valid_sessions.pop(token, None)
-        request_host = get_request_host(request)
-        response = RedirectResponse(
-            f"/login?error=Access+denied:+Your+account+is+assigned+to+'{assigned_site}'.+You+cannot+access+'{request_host}'.",
-            status_code=302
-        )
-        response.delete_cookie(COOKIE_NAME)
-        return response
+        return os.environ.get("RESEND_TO_EMAIL") or "luisdat@gmail.com"
 
-    company_name = None
-    software_name = None
     user = get_client_user(username)
-    client_id_key = str(user.get("clientId")) if (user and user.get("clientId")) else username
+    if user:
+        if user.get("email") and "@" in str(user.get("email")):
+            return str(user["email"]).strip()
+        client_id = user.get("clientId")
+        if client_id:
+            conn = None
+            try:
+                conn = get_db_connection()
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    try:
+                        cur.execute('SELECT email FROM "Client" WHERE id = %s;', (client_id,))
+                        c = cur.fetchone()
+                        if c and c.get("email") and "@" in str(c.get("email")):
+                            return str(c["email"]).strip()
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"Error fetching email for client_id {client_id}: {e}")
+            finally:
+                if conn:
+                    conn.close()
 
-    if user and user.get("clientId"):
-        conn = None
-        try:
-            conn = get_db_connection()
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                try:
-                    cur.execute('SELECT company, name, "software" FROM "Client" WHERE id = %s;', (user["clientId"],))
-                    client = cur.fetchone()
-                    if client:
-                        company_name = client.get("company") or client.get("name")
-                        software_name = client.get("software") or client.get("Software")
-                except Exception as e_col:
-                    conn.rollback()
-                    cur.execute('SELECT company, name FROM "Client" WHERE id = %s;', (user["clientId"],))
-                    client = cur.fetchone()
-                    if client:
-                        company_name = client.get("company") or client.get("name")
-        except Exception as e:
-            print(f"Error fetching client info: {e}")
-        finally:
-            if conn:
-                conn.close()
+    if "@" in str(username):
+        return str(username).strip()
 
-    if not company_name:
-        if username == APP_USERNAME or username.lower() == "admin@vrtservices12.com":
-            company_name = "VRT Services"
-        else:
-            company_name = "Datalazo Partner"
+    return os.environ.get("RESEND_TO_EMAIL") or "luisdat@gmail.com"
 
-    subdomain = get_client_subdomain(username)
-    software_config = APP_CONFIG.get("software", {})
-    clients_config = APP_CONFIG.get("clients", {})
+# ── Protected routes ───────────────────────────────────────────────────────────
+def prepare_dashboard_context(request: Request) -> dict | RedirectResponse:
+    try:
+        username = get_current_username(request)
+        if not username:
+            return RedirectResponse("/login", status_code=302)
+            
+        allowed, assigned_site = is_user_allowed_on_site(username, request)
+        if not allowed:
+            token = request.cookies.get(COOKIE_NAME)
+            if token:
+                valid_sessions.pop(token, None)
+            request_host = get_request_host(request)
+            response = RedirectResponse(
+                f"/login?error=Access+denied:+Your+account+is+assigned+to+'{assigned_site}'.+You+cannot+access+'{request_host}'.",
+                status_code=302
+            )
+            response.delete_cookie(COOKIE_NAME)
+            return response
 
-    client_conf = None
-    if software_name and isinstance(software_name, str):
-        clean_software = software_name.strip()
-        client_conf = software_config.get(clean_software)
+        company_name = None
+        software_name = None
+        user_email = None
+
+        user = get_client_user(username)
+        client_id_key = str(user.get("clientId")) if (user and user.get("clientId")) else username
+
+        if user:
+            if user.get("email") and "@" in str(user.get("email")):
+                user_email = str(user.get("email")).strip()
+
+        if user and user.get("clientId"):
+            conn = None
+            try:
+                conn = get_db_connection()
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    try:
+                        cur.execute('SELECT company, name, email, "software" FROM "Client" WHERE id = %s;', (user["clientId"],))
+                        client = cur.fetchone()
+                        if client:
+                            company_name = client.get("company") or client.get("name")
+                            software_name = client.get("software") or client.get("Software")
+                            if not user_email and client.get("email") and "@" in str(client.get("email")):
+                                user_email = str(client.get("email")).strip()
+                    except Exception as e_col:
+                        conn.rollback()
+                        cur.execute('SELECT company, name FROM "Client" WHERE id = %s;', (user["clientId"],))
+                        client = cur.fetchone()
+                        if client:
+                            company_name = client.get("company") or client.get("name")
+            except Exception as e:
+                print(f"Error fetching client info: {e}")
+            finally:
+                if conn:
+                    conn.close()
+
+        if not company_name:
+            if username == APP_USERNAME or username.lower() == "admin@vrtservices12.com":
+                company_name = "VRT Services"
+            else:
+                company_name = "Datalazo Partner"
+
+        if not user_email:
+            user_email = get_user_email(username)
+
+        subdomain = get_client_subdomain(username)
+        software_config = APP_CONFIG.get("software", {})
+        clients_config = APP_CONFIG.get("clients", {})
+
+        client_conf = None
+        if software_name and isinstance(software_name, str):
+            clean_software = software_name.strip()
+            client_conf = software_config.get(clean_software)
+            if not client_conf:
+                for key, val in software_config.items():
+                    if key.lower() == clean_software.lower():
+                        client_conf = val
+                        break
+
         if not client_conf:
-            for key, val in software_config.items():
-                if key.lower() == clean_software.lower():
-                    client_conf = val
-                    break
+            client_conf = clients_config.get(subdomain) or software_config.get("Default") or clients_config.get("vrt.datalazo.net", {})
 
-    if not client_conf:
-        client_conf = clients_config.get(subdomain) or software_config.get("Default") or clients_config.get("vrt.datalazo.net", {})
+        if not client_conf or "csv_mapping" not in client_conf:
+            client_conf = {"csv_mapping": DEFAULT_CSV_MAPPING}
 
-    if not client_conf or "csv_mapping" not in client_conf:
-        client_conf = {"csv_mapping": DEFAULT_CSV_MAPPING}
+        # Check QBO connection status safely
+        qbo_token, qbo_realm_id = None, None
+        try:
+            qbo_token, qbo_realm_id = get_valid_qbo_access_token(client_id_key)
+        except Exception as e_qbo:
+            print(f"Error checking QBO token in dashboard context: {e_qbo}")
 
-    # Check QBO connection status
-    qbo_token, qbo_realm_id = get_valid_qbo_access_token(client_id_key)
-    qbo_connected = bool(qbo_token and qbo_realm_id)
-    qbo_company_name = ""
-    if qbo_connected:
-        qbo_company_name = fetch_qbo_company_name(qbo_token, qbo_realm_id)
+        qbo_connected = bool(qbo_token and qbo_realm_id)
+        qbo_company_name = ""
+        if qbo_connected:
+            try:
+                qbo_company_name = fetch_qbo_company_name(qbo_token, qbo_realm_id)
+            except Exception as e_qname:
+                print(f"Error fetching QBO company name in dashboard context: {e_qname}")
 
-    user_parent_name = get_user_parent_name(username) or company_name or "VRT Services"
+        user_parent_name = get_user_parent_name(username) or company_name or "VRT Services"
 
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
+        return {
             "client_config": client_conf,
             "username": username,
+            "user_email": user_email,
             "company_name": company_name or "Datalazo Partner",
             "parent_name": user_parent_name,
             "software_name": software_name or "",
             "qbo_connected": qbo_connected,
             "qbo_realm_id": qbo_realm_id or "",
-            "qbo_company_name": qbo_company_name or "",
-            "msg": msg,
-            "error": error
+            "qbo_company_name": qbo_company_name or ""
         }
+    except Exception as e:
+        import traceback
+        print(f"[ERROR in prepare_dashboard_context]: {e}")
+        traceback.print_exc()
+        return {
+            "client_config": {"csv_mapping": DEFAULT_CSV_MAPPING},
+            "username": get_current_username(request) or "user",
+            "user_email": "",
+            "company_name": "VRT Services",
+            "parent_name": "VRT Services",
+            "software_name": "",
+            "qbo_connected": False,
+            "qbo_realm_id": "",
+            "qbo_company_name": "",
+            "error": f"Context notice: {str(e)}"
+        }
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse)
+async def read_dashboard(request: Request, msg: str = "", error: str = ""):
+    try:
+        ctx = prepare_dashboard_context(request)
+        if isinstance(ctx, RedirectResponse):
+            return ctx
+        ctx["msg"] = msg
+        ctx["error"] = error
+        return templates.TemplateResponse(
+            request=request,
+            name="dashboard.html",
+            context=ctx
+        )
+    except Exception as e:
+        import traceback
+        print(f"[ERROR rendering dashboard]: {e}")
+        traceback.print_exc()
+        raise e
+
+@app.get("/ocr", response_class=HTMLResponse)
+@app.get("/extractor", response_class=HTMLResponse)
+async def read_index(request: Request, msg: str = "", error: str = ""):
+    ctx = prepare_dashboard_context(request)
+    if isinstance(ctx, RedirectResponse):
+        return ctx
+    ctx["msg"] = msg
+    ctx["error"] = error
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context=ctx
     )
+
+# ── Customer CRM API Routes ───────────────────────────────────────────────────
+@app.get("/customers", response_class=HTMLResponse)
+async def read_customers_page(request: Request, msg: str = "", error: str = ""):
+    ctx = prepare_dashboard_context(request)
+    if isinstance(ctx, RedirectResponse):
+        return ctx
+    ctx["msg"] = msg
+    ctx["error"] = error
+    ctx["active_tab"] = "customers"
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context=ctx
+    )
+
+@app.get("/api/customers")
+async def get_customers(request: Request, query: str = "", parentName: str = ""):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    user_parent = get_user_parent_name(username) or "VRT Services"
+    target_parent = parentName.strip() if parentName.strip() else user_parent
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            sql = "SELECT * FROM customer"
+            params = []
+            where_clauses = []
+
+            if target_parent:
+                if target_parent.lower() == "vrt services":
+                    where_clauses.append("(LOWER(COALESCE(parent_name, '')) = LOWER(%s) OR parent_name IS NULL OR parent_name = '')")
+                    params.append(target_parent)
+                else:
+                    where_clauses.append("(LOWER(COALESCE(parent_name, '')) = LOWER(%s))")
+                    params.append(target_parent)
+
+            if query.strip():
+                q = f"%{query.strip()}%"
+                where_clauses.append("(custumer_number ILIKE %s OR legal_name ILIKE %s OR display_name ILIKE %s OR email ILIKE %s OR phone ILIKE %s)")
+                params.extend([q, q, q, q, q])
+            
+            if where_clauses:
+                sql += " WHERE " + " AND ".join(where_clauses)
+
+            sql += " ORDER BY id DESC;"
+            cur.execute(sql, tuple(params))
+            records = cur.fetchall()
+            
+            result = []
+            for r in records:
+                row = dict(r)
+                if row.get("created_at"):
+                    row["created_at"] = str(row["created_at"])
+                if row.get("updated_at"):
+                    row["updated_at"] = str(row["updated_at"])
+                result.append(row)
+            return {"customers": result}
+    except Exception as e:
+        print(f"Error fetching customers: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/api/customers")
+async def create_customer(request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    data = await request.json()
+    custumer_number = (data.get("custumer_number") or "").strip()
+    customer_type = (data.get("customer_type") or "Business").strip()
+    legal_name = (data.get("legal_name") or "").strip()
+    display_name = (data.get("display_name") or "").strip() or None
+    tax_id = (data.get("tax_id") or "").strip() or None
+    status = (data.get("status") or "Active").strip()
+    assigned_user_id = data.get("assigned_user_id")
+    if assigned_user_id == "" or assigned_user_id is None:
+        assigned_user_id = None
+    else:
+        try:
+            assigned_user_id = int(assigned_user_id)
+        except ValueError:
+            assigned_user_id = None
+    phone = (data.get("phone") or "").strip() or None
+    email = (data.get("email") or "").strip() or None
+    website = (data.get("website") or "").strip() or None
+    notes = (data.get("notes") or "").strip() or None
+    parent_name = (data.get("parent_name") or get_user_parent_name(username) or "VRT Services").strip()
+
+    if not custumer_number:
+        raise HTTPException(status_code=400, detail="Customer Number is required")
+    if not legal_name:
+        raise HTTPException(status_code=400, detail="Legal Name is required")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO customer (
+                    custumer_number, customer_type, legal_name, display_name,
+                    tax_id, status, assigned_user_id, phone, email, website, notes, parent_name,
+                    created_at, updated_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                ) RETURNING *;
+            """, (custumer_number, customer_type, legal_name, display_name, tax_id, status, assigned_user_id, phone, email, website, notes, parent_name))
+            new_record = dict(cur.fetchone())
+
+            # Auto-create parent mapping for the new customer
+            try:
+                sync_customer_parent_mapping(cur, parent_name, legal_name, display_name)
+            except Exception as map_err:
+                print(f"Warning: Auto parent-client mapping failed for customer '{legal_name}': {map_err}")
+
+            conn.commit()
+
+            # Auto-initialize DigitalOcean Space folders for new customer based on customer_type
+            try:
+                init_customer_do_folders(new_record["id"], legal_name, parent_name=parent_name, customer_type=customer_type)
+            except Exception as do_err:
+                print(f"Warning: Auto-init DigitalOcean storage failed for '{legal_name}': {do_err}")
+
+            if new_record.get("created_at"):
+                new_record["created_at"] = str(new_record["created_at"])
+            if new_record.get("updated_at"):
+                new_record["updated_at"] = str(new_record["updated_at"])
+            return {"message": "Customer created successfully", "customer": new_record}
+    except psycopg2.IntegrityError:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=f"Customer Number '{custumer_number}' already exists.")
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"Error creating customer: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/api/customers/{customer_id}/init-storage")
+async def init_customer_storage(customer_id: int, request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+        success, path, folders = init_customer_do_folders(cust["id"], cust["legal_name"], parent_name=cust.get("parent_name"))
+        bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+        return {
+            "success": success,
+            "customer_id": customer_id,
+            "path": path,
+            "status": "Initialized" if success else "Failed",
+            "folders": folders,
+            "message": "Customer Storage initialized successfully" if success else f"Storage init result: {folders}"
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error initializing storage for customer {customer_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/api/customers/{customer_id}/storage/files")
+async def get_customer_storage_files(customer_id: int, request: Request, prefix: str = None):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+        root_folder_path = get_customer_root_folder_path(cust)
+        if not cust.get("do_folder_path") or cust.get("do_storage_status") != "Initialized":
+            try:
+                success, init_path, _ = init_customer_do_folders(cust["id"], cust["legal_name"], parent_name=cust.get("parent_name"))
+                if success:
+                    root_folder_path = init_path
+            except Exception as e:
+                print(f"Auto-init storage warning: {e}")
+
+        current_prefix = prefix.strip() if prefix else root_folder_path
+        if not current_prefix.endswith('/'):
+            current_prefix += '/'
+
+        # Security check: ensure current_prefix is within customer's root_folder_path
+        if not current_prefix.startswith(root_folder_path.rstrip('/')):
+            current_prefix = root_folder_path
+
+        client, err = get_s3_client()
+        if not client:
+            raise HTTPException(status_code=400, detail=f"S3 client not configured: {err}")
+
+        bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+        response = client.list_objects_v2(Bucket=bucket, Prefix=current_prefix, Delimiter='/')
+
+        subfolders = []
+        for cp in response.get('CommonPrefixes', []):
+            folder_key = cp['Prefix']
+            folder_name = folder_key[len(current_prefix):].rstrip('/')
+            if folder_name:
+                subfolders.append({
+                    "name": folder_name,
+                    "prefix": folder_key,
+                    "is_folder": True
+                })
+
+        files = []
+        for obj in response.get('Contents', []):
+            key = obj['Key']
+            if key == current_prefix or key.endswith('/'):
+                continue
+
+            size = obj['Size']
+            last_modified = obj['LastModified'].isoformat() if obj.get('LastModified') else ''
+            filename = key[len(current_prefix):] if key.startswith(current_prefix) else os.path.basename(key)
+
+            presigned_url = None
+            if size > 0:
+                try:
+                    params = {'Bucket': bucket, 'Key': key, 'ResponseContentDisposition': 'inline'}
+                    if key.lower().endswith('.pdf'):
+                        params['ResponseContentType'] = 'application/pdf'
+                    presigned_url = client.generate_presigned_url(
+                        'get_object',
+                        Params=params,
+                        ExpiresIn=3600
+                    )
+                except Exception:
+                    pass
+
+            files.append({
+                "key": key,
+                "name": filename,
+                "size": size,
+                "last_modified": last_modified,
+                "is_folder": False,
+                "url": presigned_url or f"https://{bucket}.nyc3.digitaloceanspaces.com/{key}"
+            })
+
+        return {
+            "customer_id": customer_id,
+            "customer_name": cust["legal_name"],
+            "parent_name": cust.get("parent_name") or "VRT Services",
+            "root_folder": root_folder_path,
+            "current_prefix": current_prefix,
+            "bucket": bucket,
+            "subfolders": subfolders,
+            "files": files
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error listing customer storage files: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/api/storage/view-pdf")
+async def view_pdf_proxy(key: str, request: Request):
+    """Streams a PDF document from DigitalOcean Spaces with inline Content-Disposition for in-app modal previewing."""
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not key or not key.strip():
+        raise HTTPException(status_code=400, detail="Key parameter is required")
+
+    client, err = get_s3_client()
+    if not client:
+        raise HTTPException(status_code=400, detail=f"S3 client not configured: {err}")
+
+    bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+    try:
+        s3_obj = client.get_object(Bucket=bucket, Key=key)
+        filename = os.path.basename(key)
+        content_type = s3_obj.get("ContentType") or "application/pdf"
+        if key.lower().endswith(".pdf"):
+            content_type = "application/pdf"
+
+        headers = {
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "public, max-age=3600"
+        }
+        return StreamingResponse(
+            s3_obj["Body"],
+            media_type=content_type,
+            headers=headers
+        )
+    except Exception as e:
+        print(f"Error fetching PDF key '{key}' from storage: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch PDF document: {e}")
+
+@app.post("/api/customers/{customer_id}/storage/upload")
+async def upload_customer_storage_file(
+    customer_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    target_prefix: str = Form(None)
+):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+        root_folder = get_customer_root_folder_path(cust)
+        upload_prefix = target_prefix.strip() if target_prefix else root_folder
+        if not upload_prefix.endswith('/'):
+            upload_prefix += '/'
+
+        if not upload_prefix.startswith(root_folder.rstrip('/')):
+            upload_prefix = root_folder
+
+        filename = os.path.basename(file.filename)
+        file_key = f"{upload_prefix}{filename}"
+
+        client, err = get_s3_client()
+        if not client:
+            raise HTTPException(status_code=400, detail=f"S3 client not configured: {err}")
+
+        bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+        client.upload_fileobj(file.file, bucket, file_key)
+
+        # Auto-update checklist milestones based on folder/file path & detected period
+        detected_period = extract_period_from_key(file_key)
+        lower_key = file_key.lower()
+        print(f"[CHECKLIST AUTO-UPDATE] Customer: {customer_id}, FileKey: '{file_key}', Period: '{detected_period}'")
+
+        if "check" in lower_key:
+            update_customer_checklist_milestone(customer_id, detected_period, "checks_received")
+        if "bank statement" in lower_key or "statement" in lower_key or (lower_key.endswith(".pdf") and "check" not in lower_key and "tax" not in lower_key):
+            update_customer_checklist_milestone(customer_id, detected_period, "statement_received")
+
+        return {"message": "File uploaded successfully", "key": file_key}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error uploading file to storage: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.delete("/api/customers/{customer_id}/storage/file")
+async def delete_customer_storage_file(customer_id: int, key: str, request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+        root_folder = get_customer_root_folder_path(cust)
+        if not key.startswith(root_folder.rstrip('/')):
+            raise HTTPException(status_code=403, detail="Forbidden: Cannot delete files outside customer storage path")
+
+        client, err = get_s3_client()
+        if not client:
+            raise HTTPException(status_code=400, detail=f"S3 client not configured: {err}")
+
+        bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+        client.delete_object(Bucket=bucket, Key=key)
+
+        return {"message": "File deleted successfully", "key": key}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error deleting file from storage: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/api/customers/{customer_id}/storage/rename-file")
+async def rename_customer_storage_file(customer_id: int, request: Request):
+    """Renames a file in customer storage by copying to new_key and deleting old_key."""
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    data = await request.json()
+    old_key = (data.get("old_key") or "").strip()
+    new_name = (data.get("new_name") or "").strip()
+
+    if not old_key or not new_name:
+        raise HTTPException(status_code=400, detail="old_key and new_name are required")
+
+    # Sanitize new file name
+    import re
+    new_name = re.sub(r'[\\/:*?"<>|]', '-', new_name)
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+        root_folder = get_customer_root_folder_path(cust)
+        if not old_key.startswith(root_folder.rstrip('/')):
+            raise HTTPException(status_code=403, detail="Forbidden: Cannot rename files outside customer storage path")
+
+        # Determine target key (keep in same subfolder directory)
+        parent_dir = os.path.dirname(old_key.rstrip('/'))
+        if parent_dir and not parent_dir.endswith('/'):
+            parent_dir += '/'
+        new_key = f"{parent_dir}{new_name}"
+
+        client, err = get_s3_client()
+        if not client:
+            raise HTTPException(status_code=400, detail=f"S3 client not configured: {err}")
+
+        bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+
+        # Copy to new_key and delete old_key
+        client.copy_object(
+            Bucket=bucket,
+            CopySource={'Bucket': bucket, 'Key': old_key},
+            Key=new_key,
+            ACL='private'
+        )
+        client.delete_object(Bucket=bucket, Key=old_key)
+
+        print(f"[DO SPACES] Renamed file '{old_key}' -> '{new_key}' for customer {customer_id}")
+        return {
+            "success": True,
+            "old_key": old_key,
+            "new_key": new_key,
+            "message": f"File renamed to '{new_name}' successfully"
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error renaming file in storage: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/api/customers/{customer_id}/storage/mkdir")
+async def create_customer_storage_folder(customer_id: int, request: Request):
+    """Creates a new folder (empty object with trailing slash) at the specified path inside the customer's storage root."""
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    data = await request.json()
+    folder_name = (data.get("folder_name") or "").strip().strip("/")
+    parent_prefix = (data.get("parent_prefix") or "").strip()
+
+    if not folder_name:
+        raise HTTPException(status_code=400, detail="folder_name is required")
+
+    # Sanitize folder name — strip path separators to prevent traversal
+    import re
+    folder_name = re.sub(r'[\\/:*?"<>|]', '-', folder_name)
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+        root_folder = get_customer_root_folder_path(cust)
+        if not root_folder.endswith("/"):
+            root_folder += "/"
+
+        # Determine parent prefix
+        if parent_prefix:
+            if not parent_prefix.endswith("/"):
+                parent_prefix += "/"
+            # Security check: parent must be within customer root
+            if not parent_prefix.startswith(root_folder.rstrip("/")):
+                parent_prefix = root_folder
+        else:
+            parent_prefix = root_folder
+
+        new_folder_key = f"{parent_prefix}{folder_name}/"
+
+        client, err = get_s3_client()
+        if not client:
+            raise HTTPException(status_code=400, detail=f"S3 client not configured: {err}")
+
+        bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+        client.put_object(Bucket=bucket, Key=new_folder_key, Body=b'', ACL='private')
+
+        print(f"[DO SPACES] Manually created folder '{new_folder_key}' for customer '{cust['legal_name']}'")
+        return {
+            "success": True,
+            "folder_key": new_folder_key,
+            "message": f"Folder '{folder_name}' created successfully"
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error creating folder in storage: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.delete("/api/customers/{customer_id}/storage/folder")
+async def delete_customer_storage_folder(customer_id: int, prefix: str, request: Request):
+    """Deletes a folder and ALL its contents recursively from the customer's storage space."""
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not prefix or not prefix.strip("/"):
+        raise HTTPException(status_code=400, detail="prefix is required")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+        root_folder = get_customer_root_folder_path(cust)
+        if not root_folder.endswith("/"):
+            root_folder += "/"
+
+        folder_prefix = prefix if prefix.endswith("/") else prefix + "/"
+
+        # Security: must be inside customer root and NOT be the root itself
+        if not folder_prefix.startswith(root_folder.rstrip("/")):
+            raise HTTPException(status_code=403, detail="Forbidden: Cannot delete folders outside customer storage path")
+        if folder_prefix == root_folder:
+            raise HTTPException(status_code=403, detail="Forbidden: Cannot delete the customer's root folder")
+
+        client, err = get_s3_client()
+        if not client:
+            raise HTTPException(status_code=400, detail=f"S3 client not configured: {err}")
+
+        bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+
+        # Paginate through all objects under the prefix and collect keys to delete
+        keys_to_delete = []
+        paginator = client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket, Prefix=folder_prefix):
+            for obj in page.get("Contents", []):
+                keys_to_delete.append({"Key": obj["Key"]})
+
+        deleted_count = 0
+        if keys_to_delete:
+            # S3 batch delete supports up to 1000 keys per request
+            for i in range(0, len(keys_to_delete), 1000):
+                batch = keys_to_delete[i:i+1000]
+                client.delete_objects(Bucket=bucket, Delete={"Objects": batch, "Quiet": True})
+                deleted_count += len(batch)
+
+        print(f"[DO SPACES] Deleted folder '{folder_prefix}' ({deleted_count} objects) for customer '{cust['legal_name']}'")
+        return {
+            "success": True,
+            "folder_prefix": folder_prefix,
+            "deleted_count": deleted_count,
+            "message": f"Folder deleted successfully ({deleted_count} object(s) removed)"
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error deleting folder from storage: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+# ── Customer Bookkeeping Task Checklist Endpoints ────────────────────────────────
+@app.get("/api/customers/{customer_id}/checklist")
+async def get_customer_checklist(customer_id: int, period: str = None, request: Request = None):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    import datetime
+    if not period or not period.strip():
+        period = datetime.datetime.now().strftime("%Y-%m")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+            cur.execute(
+                "SELECT * FROM customer_task_checklist WHERE customer_id = %s AND period = %s;",
+                (customer_id, period)
+            )
+            row = cur.fetchone()
+            if not row:
+                cur.execute("""
+                    INSERT INTO customer_task_checklist (customer_id, period)
+                    VALUES (%s, %s)
+                    ON CONFLICT (customer_id, period) DO NOTHING;
+                """, (customer_id, period))
+                conn.commit()
+                cur.execute(
+                    "SELECT * FROM customer_task_checklist WHERE customer_id = %s AND period = %s;",
+                    (customer_id, period)
+                )
+                row = cur.fetchone()
+
+        bk_steps = {
+            "bank_statement_received": bool(row.get("bank_statement_received")) if row else False,
+            "check_images_received": bool(row.get("check_images_received")) if row else False,
+            "extraction_ai_categorization_done": bool(row.get("extraction_ai_categorization_done")) if row else False,
+            "accountant_reviewed": bool(row.get("accountant_reviewed")) if row else False
+        }
+        bk_completed = sum(bk_steps.values())
+
+        tax_steps = {
+            "tax_docs_requested": bool(row.get("tax_docs_requested")) if row else False,
+            "tax_docs_received": bool(row.get("tax_docs_received")) if row else False,
+            "tax_organizer": bool(row.get("tax_organizer")) if row else False,
+            "tax_preparation": bool(row.get("tax_preparation")) if row else False,
+            "tax_review": bool(row.get("tax_review")) if row else False,
+            "tax_client_signature": bool(row.get("tax_client_signature")) if row else False,
+            "tax_efile": bool(row.get("tax_efile")) if row else False,
+            "tax_accepted": bool(row.get("tax_accepted")) if row else False
+        }
+        tax_completed = sum(tax_steps.values())
+
+        return {
+            "customer_id": customer_id,
+            "legal_name": cust.get("legal_name"),
+            "period": period,
+            "bookkeeping": {
+                "steps": bk_steps,
+                "completed_count": bk_completed,
+                "total_steps": 4,
+                "progress_percent": int((bk_completed / 4.0) * 100)
+            },
+            "tax": {
+                "steps": tax_steps,
+                "completed_count": tax_completed,
+                "total_steps": 8,
+                "progress_percent": int((tax_completed / 8.0) * 100)
+            },
+            "steps": bk_steps,
+            "completed_count": bk_completed,
+            "total_steps": 4,
+            "progress_percent": int((bk_completed / 4.0) * 100),
+            "notes": (row.get("notes") or "") if row else "",
+            "tax_notes": (row.get("tax_notes") or "") if row else "",
+            "updated_at": row.get("updated_at").isoformat() if row and row.get("updated_at") else None
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error fetching customer checklist: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/api/customers/{customer_id}/checklist/toggle")
+async def toggle_customer_checklist_step(customer_id: int, request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    data = await request.json()
+    import datetime
+    period = (data.get("period") or "").strip() or datetime.datetime.now().strftime("%Y-%m")
+    step_key = data.get("step_key")
+    val = bool(data.get("value"))
+    notes = data.get("notes")
+    tax_notes = data.get("tax_notes")
+
+    col_map = {
+        "bank_statement_received": "bank_statement_received",
+        "check_images_received": "check_images_received",
+        "extraction_ai_categorization_done": "extraction_ai_categorization_done",
+        "accountant_reviewed": "accountant_reviewed",
+        "tax_docs_requested": "tax_docs_requested",
+        "tax_docs_received": "tax_docs_received",
+        "tax_organizer": "tax_organizer",
+        "tax_preparation": "tax_preparation",
+        "tax_review": "tax_review",
+        "tax_client_signature": "tax_client_signature",
+        "tax_efile": "tax_efile",
+        "tax_accepted": "tax_accepted"
+    }
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+            # Ensure row exists
+            cur.execute("""
+                INSERT INTO customer_task_checklist (customer_id, period)
+                VALUES (%s, %s)
+                ON CONFLICT (customer_id, period) DO NOTHING;
+            """, (customer_id, period))
+
+            if step_key and step_key in col_map:
+                col_name = col_map[step_key]
+                cur.execute(f"""
+                    UPDATE customer_task_checklist
+                    SET {col_name} = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE customer_id = %s AND period = %s;
+                """, (val, customer_id, period))
+
+            if notes is not None:
+                cur.execute("""
+                    UPDATE customer_task_checklist
+                    SET notes = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE customer_id = %s AND period = %s;
+                """, (notes, customer_id, period))
+
+            if tax_notes is not None:
+                cur.execute("""
+                    UPDATE customer_task_checklist
+                    SET tax_notes = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE customer_id = %s AND period = %s;
+                """, (tax_notes, customer_id, period))
+
+            conn.commit()
+
+        return await get_customer_checklist(customer_id, period, request)
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error toggling customer checklist step: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.put("/api/customers/{customer_id}")
+async def update_customer(customer_id: int, request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    data = await request.json()
+    custumer_number = (data.get("custumer_number") or "").strip()
+    customer_type = (data.get("customer_type") or "Business").strip()
+    legal_name = (data.get("legal_name") or "").strip()
+    display_name = (data.get("display_name") or "").strip() or None
+    tax_id = (data.get("tax_id") or "").strip() or None
+    status = (data.get("status") or "Active").strip()
+    assigned_user_id = data.get("assigned_user_id")
+    if assigned_user_id == "" or assigned_user_id is None:
+        assigned_user_id = None
+    else:
+        try:
+            assigned_user_id = int(assigned_user_id)
+        except ValueError:
+            assigned_user_id = None
+    phone = (data.get("phone") or "").strip() or None
+    email = (data.get("email") or "").strip() or None
+    website = (data.get("website") or "").strip() or None
+    notes = (data.get("notes") or "").strip() or None
+    parent_name = (data.get("parent_name") or get_user_parent_name(username) or "VRT Services").strip()
+
+    if not custumer_number:
+        raise HTTPException(status_code=400, detail="Customer Number is required")
+    if not legal_name:
+        raise HTTPException(status_code=400, detail="Legal Name is required")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                UPDATE customer SET
+                    custumer_number = %s,
+                    customer_type = %s,
+                    legal_name = %s,
+                    display_name = %s,
+                    tax_id = %s,
+                    status = %s,
+                    assigned_user_id = %s,
+                    phone = %s,
+                    email = %s,
+                    website = %s,
+                    notes = %s,
+                    parent_name = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                RETURNING *;
+            """, (custumer_number, customer_type, legal_name, display_name, tax_id, status, assigned_user_id, phone, email, website, notes, parent_name, customer_id))
+            updated_record = cur.fetchone()
+            if not updated_record:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+            # Auto-create parent mapping for updated customer
+            try:
+                sync_customer_parent_mapping(cur, parent_name, legal_name, display_name)
+            except Exception as map_err:
+                print(f"Warning: Auto parent-client mapping failed on update for '{legal_name}': {map_err}")
+
+            conn.commit()
+            res = dict(updated_record)
+            if res.get("created_at"):
+                res["created_at"] = str(res["created_at"])
+            if res.get("updated_at"):
+                res["updated_at"] = str(res["updated_at"])
+            return {"message": "Customer updated successfully", "customer": res}
+    except psycopg2.IntegrityError:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=f"Customer Number '{custumer_number}' already exists on another record.")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"Error updating customer: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.delete("/api/customers/{customer_id}")
+async def delete_customer(customer_id: int, request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM customer WHERE id = %s RETURNING id;", (customer_id,))
+            deleted = cur.fetchone()
+            if not deleted:
+                raise HTTPException(status_code=404, detail="Customer not found")
+            conn.commit()
+            return {"message": "Customer deleted successfully", "id": customer_id}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"Error deleting customer: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
 
 # ── QBO OAuth & Export API Routes ──────────────────────────────────────────────
 @app.get("/auth/qbo/login")
@@ -1800,7 +3278,7 @@ async def process_pdf(
     request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    use_history: bool = Form(False),
+    use_history: bool = Form(True),
     parent_name: str = Form(None),
 ):
     username = get_current_username(request)
@@ -1905,6 +3383,196 @@ async def process_check_pdf(
         raise HTTPException(status_code=500, detail=f"Check image extraction failed: {str(e)}")
 
 
+# ── DigitalOcean Spaces → Direct Extraction Endpoints ────────────────────────
+
+@app.post("/process-from-do")
+async def process_pdf_from_do(
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """Download a bank statement PDF from DigitalOcean Spaces server-side and run extraction."""
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    allowed, assigned_site = is_user_allowed_on_site(username, request)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=f"Access denied: Your account is assigned to '{assigned_site}'.")
+
+    data = await request.json()
+    s3_key   = (data.get("key") or "").strip()
+    use_history = bool(data.get("use_history", True))
+    customer_id = data.get("customer_id")
+
+    if not s3_key:
+        raise HTTPException(status_code=400, detail="key is required.")
+    if not s3_key.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported for bank statement extraction.")
+
+    # Validate customer belongs to user's parent account
+    user_parent = get_user_parent_name(username)
+    if customer_id:
+        conn = None
+        try:
+            conn = get_db_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+                cust = cur.fetchone()
+                if not cust:
+                    raise HTTPException(status_code=404, detail="Customer not found.")
+                cust_parent = (cust.get("parent_name") or "").strip().lower()
+                user_parent_clean = user_parent.lower()
+                if cust_parent and cust_parent != user_parent_clean and cust_parent not in ("", "vrt services") and user_parent_clean not in ("", "vrt services"):
+                    raise HTTPException(status_code=403, detail="Access denied: Customer does not belong to your account.")
+                # Validate key is within this customer's root folder
+                root_folder = cust.get("do_folder_path") or f"{sanitize_folder_name(cust['legal_name'])}/"
+                if not s3_key.startswith(root_folder.rstrip("/")):
+                    raise HTTPException(status_code=403, detail="Access denied: File is outside customer storage path.")
+        finally:
+            if conn:
+                conn.close()
+
+    client, err = get_s3_client()
+    if not client:
+        raise HTTPException(status_code=400, detail=f"S3 client not configured: {err}")
+
+    bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+
+    temp_dir = tempfile.mkdtemp()
+    filename = os.path.basename(s3_key) or "input.pdf"
+    pdf_path = os.path.join(temp_dir, filename)
+
+    try:
+        client.download_file(bucket, s3_key, pdf_path)
+    except Exception as e:
+        cleanup_temp_dir(temp_dir)
+        raise HTTPException(status_code=500, detail=f"Failed to download file from storage: {e}")
+
+    try:
+        result_data = run_extraction(
+            pdf_path,
+            temp_dir,
+            create_csv=False,
+            use_history=use_history,
+            client_history_fetcher=get_client_history_rules,
+            parent_name=user_parent
+        )
+
+        if customer_id:
+            detected_period = extract_period_from_key(s3_key)
+            update_customer_checklist_milestone(customer_id, detected_period, "statement_received")
+            update_customer_checklist_milestone(customer_id, detected_period, "extraction_done")
+        # Record usage
+        try:
+            import fitz
+            doc = fitz.open(pdf_path)
+            page_count = len(doc)
+            doc.close()
+            record_user_usage(username, page_count)
+        except Exception as ex:
+            print(f"Error counting pages or recording usage: {ex}")
+
+        background_tasks.add_task(cleanup_temp_dir, temp_dir)
+        return result_data
+    except ValueError as ve:
+        cleanup_temp_dir(temp_dir)
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        cleanup_temp_dir(temp_dir)
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
+
+
+@app.post("/process-checks-from-do")
+async def process_checks_from_do(
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """Download check image file(s) from DigitalOcean Spaces server-side and run check extraction."""
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    allowed, assigned_site = is_user_allowed_on_site(username, request)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=f"Access denied: Your account is assigned to '{assigned_site}'.")
+
+    data = await request.json()
+    s3_keys     = data.get("keys") or []
+    use_history = bool(data.get("use_history", True))
+    client_name = (data.get("client_name") or "").strip() or None
+    customer_id = data.get("customer_id")
+
+    if not s3_keys:
+        raise HTTPException(status_code=400, detail="keys (list) is required.")
+
+    user_parent = get_user_parent_name(username)
+    root_folder = None
+
+    if customer_id:
+        conn = None
+        try:
+            conn = get_db_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+                cust = cur.fetchone()
+                if not cust:
+                    raise HTTPException(status_code=404, detail="Customer not found.")
+                cust_parent = (cust.get("parent_name") or "").strip().lower()
+                user_parent_clean = user_parent.lower()
+                if cust_parent and cust_parent != user_parent_clean and cust_parent not in ("", "vrt services") and user_parent_clean not in ("", "vrt services"):
+                    raise HTTPException(status_code=403, detail="Access denied: Customer does not belong to your account.")
+                root_folder = cust.get("do_folder_path") or f"{sanitize_folder_name(cust['legal_name'])}/"
+                if not client_name:
+                    client_name = cust.get("legal_name")
+        finally:
+            if conn:
+                conn.close()
+
+    allowed_exts = {".pdf", ".png", ".jpg", ".jpeg"}
+    all_checks = []
+
+    s3_client, err = get_s3_client()
+    if not s3_client:
+        raise HTTPException(status_code=400, detail=f"S3 client not configured: {err}")
+
+    bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+
+    for s3_key in s3_keys:
+        ext = os.path.splitext(s3_key.lower())[1]
+        if ext not in allowed_exts:
+            continue
+        if root_folder and not s3_key.startswith(root_folder.rstrip("/")):
+            continue  # silently skip keys outside root for safety
+
+        temp_dir = tempfile.mkdtemp()
+        filename = os.path.basename(s3_key) or f"check{ext}"
+        check_path = os.path.join(temp_dir, filename)
+
+        try:
+            s3_client.download_file(bucket, s3_key, check_path)
+        except Exception as e:
+            cleanup_temp_dir(temp_dir)
+            print(f"[DO] Failed to download check file {s3_key}: {e}")
+            continue
+
+        try:
+            check_data = extract_check_images(
+                check_path,
+                temp_dir,
+                use_history=use_history,
+                client_history_fetcher=get_client_history_rules,
+                parent_name=user_parent,
+                client_name=client_name,
+                original_filename=filename
+            )
+            all_checks.extend(check_data.get("checks", []))
+            background_tasks.add_task(cleanup_temp_dir, temp_dir)
+        except Exception as e:
+            cleanup_temp_dir(temp_dir)
+            print(f"[DO] Check extraction failed for {s3_key}: {e}")
+
+    return {"checks": all_checks, "count": len(all_checks)}
+
 @app.post("/support")
 async def support_submit(
     request: Request,
@@ -1933,25 +3601,22 @@ async def support_submit(
             detail="Support email feature is not configured: Resend API Key is missing or invalid on the server. Please add your Resend API Key (e.g., RESEND_API_KEY) in Easypanel environment variables."
         )
 
-    from_email = (
+    raw_from = (
         os.environ.get("RESEND_FROM_EMAIL") or
         os.environ.get("FROM_EMAIL") or
-        os.environ.get("SENDER_EMAIL")
+        os.environ.get("SENDER_EMAIL") or
+        "support@datalazo.net"
     )
-    if from_email:
-        from_email = from_email.strip().strip('\'"')
-    if not from_email or "@" not in from_email:
-        from_email = "support@datalazo.net"
+    clean_from = parse_clean_email(raw_from) or "support@datalazo.net"
+    from_email = clean_from
         
-    to_email = (
+    raw_to = (
         os.environ.get("RESEND_TO_EMAIL") or
         os.environ.get("TO_EMAIL") or
-        os.environ.get("SUPPORT_EMAIL")
+        os.environ.get("SUPPORT_EMAIL") or
+        "luislazo@datalazo.net"
     )
-    if to_email:
-        to_email = to_email.strip().strip('\'"')
-    if not to_email or "@" not in to_email:
-        to_email = "luislazo@datalazo.net"
+    clean_to = parse_clean_email(raw_to) or "luislazo@datalazo.net"
     
     subject = "Support Request - Bank Statement OCR Extractor"
     
@@ -1974,8 +3639,8 @@ async def support_submit(
             })
             
     payload = {
-        "from": from_email,
-        "to": [to_email],
+        "from": f"CRM Support <{clean_from}>",
+        "to": [clean_to],
         "subject": subject,
         "html": html_content
     }
@@ -2008,6 +3673,496 @@ async def support_submit(
     except Exception as e:
         print(f"Error occurred while sending email: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error sending email: {str(e)}")
+
+# ── Workload Pending Tasks Endpoint ──────────────────────────────────────────────
+@app.get("/api/dashboard/pending-tasks")
+async def get_dashboard_pending_tasks(request: Request, parentName: str = ""):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    user_parent = get_user_parent_name(username) or "VRT Services"
+    target_parent = parentName.strip() if parentName.strip() else user_parent
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            sql = """
+                SELECT DISTINCT ON (c.id)
+                       c.id, c.custumer_number, c.customer_type, c.legal_name, c.display_name, c.email, c.phone, c.status, c.parent_name,
+                       ch.period, ch.bank_statement_received, ch.check_images_received,
+                       ch.extraction_ai_categorization_done, ch.accountant_reviewed,
+                       ch.tax_docs_requested, ch.tax_docs_received, ch.tax_organizer,
+                       ch.tax_preparation, ch.tax_review, ch.tax_client_signature,
+                       ch.tax_efile, ch.tax_accepted, ch.notes, ch.tax_notes, ch.updated_at
+                FROM customer c
+                LEFT JOIN customer_task_checklist ch ON c.id = ch.customer_id
+            """
+            params = []
+            where_clauses = ["LOWER(c.status) = 'active'"]
+
+            if target_parent:
+                if target_parent.lower() == "vrt services":
+                    where_clauses.append("(LOWER(COALESCE(c.parent_name, '')) = LOWER(%s) OR c.parent_name IS NULL OR c.parent_name = '')")
+                    params.append(target_parent)
+                else:
+                    where_clauses.append("(LOWER(COALESCE(c.parent_name, '')) = LOWER(%s))")
+                    params.append(target_parent)
+
+            sql += " WHERE " + " AND ".join(where_clauses) + " ORDER BY c.id, ch.updated_at DESC NULLS LAST;"
+            cur.execute(sql, tuple(params))
+            records = cur.fetchall()
+
+            pending_items = []
+            bk_pending_count = 0
+            tax_pending_count = 0
+            total_customers_with_pending = set()
+
+            for r in records:
+                row = dict(r)
+                cust_id = row["id"]
+                c_type = (row.get("customer_type") or "Business").strip()
+                is_individual = c_type.lower() == "individual"
+
+                # Calculate Bookkeeping Steps (4 steps)
+                bk_total = 4
+                bk_completed = 0
+                bk_missing = []
+
+                if not is_individual:
+                    if row.get("bank_statement_received"): bk_completed += 1
+                    else: bk_missing.append("Bank Statement Received")
+
+                    if row.get("check_images_received"): bk_completed += 1
+                    else: bk_missing.append("Check Images Received")
+
+                    if row.get("extraction_ai_categorization_done"): bk_completed += 1
+                    else: bk_missing.append("AI Categorization")
+
+                    if row.get("accountant_reviewed"): bk_completed += 1
+                    else: bk_missing.append("Accountant Review")
+                
+                bk_percent = int((bk_completed / bk_total) * 100) if not is_individual else 100
+
+                # Calculate Tax Steps (8 steps)
+                tax_total = 8
+                tax_completed = 0
+                tax_missing = []
+
+                if row.get("tax_docs_requested"): tax_completed += 1
+                else: tax_missing.append("Docs Requested")
+
+                if row.get("tax_docs_received"): tax_completed += 1
+                else: tax_missing.append("Docs Received")
+
+                if row.get("tax_organizer"): tax_completed += 1
+                else: tax_missing.append("Tax Organizer")
+
+                if row.get("tax_preparation"): tax_completed += 1
+                else: tax_missing.append("Preparation")
+
+                if row.get("tax_review"): tax_completed += 1
+                else: tax_missing.append("Review")
+
+                if row.get("tax_client_signature"): tax_completed += 1
+                else: tax_missing.append("Client Signature")
+
+                if row.get("tax_efile"): tax_completed += 1
+                else: tax_missing.append("E-file")
+
+                if row.get("tax_accepted"): tax_completed += 1
+                else: tax_missing.append("Accepted")
+
+                tax_percent = int((tax_completed / tax_total) * 100)
+
+                has_bk_pending = (not is_individual) and (bk_completed < bk_total)
+                has_tax_pending = (tax_completed < tax_total)
+
+                if has_bk_pending: bk_pending_count += 1
+                if has_tax_pending: tax_pending_count += 1
+
+                if has_bk_pending or has_tax_pending:
+                    total_customers_with_pending.add(cust_id)
+                    pending_items.append({
+                        "customer_id": cust_id,
+                        "custumer_number": row.get("custumer_number"),
+                        "legal_name": row.get("legal_name"),
+                        "display_name": row.get("display_name"),
+                        "customer_type": c_type,
+                        "period": row.get("period") or "2026-04",
+                        "is_individual": is_individual,
+                        "bk": {
+                            "completed_count": bk_completed,
+                            "total_count": bk_total,
+                            "progress_percent": bk_percent,
+                            "missing_steps": bk_missing,
+                            "has_pending": has_bk_pending
+                        },
+                        "tax": {
+                            "completed_count": tax_completed,
+                            "total_count": tax_total,
+                            "progress_percent": tax_percent,
+                            "missing_steps": tax_missing,
+                            "has_pending": has_tax_pending
+                        }
+                    })
+
+            return {
+                "summary": {
+                    "pending_bookkeeping_count": bk_pending_count,
+                    "pending_tax_count": tax_pending_count,
+                    "total_incomplete_customers": len(total_customers_with_pending)
+                },
+                "pending_tasks": pending_items
+            }
+    except Exception as e:
+        print(f"Error fetching pending tasks: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+# ── Customer Email Communication & Inbound Webhooks ───────────────────────────
+@app.post("/api/customers/{customer_id}/send-email")
+async def send_customer_email(customer_id: int, request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    body = await request.json()
+    subject = (body.get("subject") or "").strip()
+    message_text = (body.get("message") or "").strip()
+    custom_reply_to = (body.get("reply_to") or "").strip()
+    if not custom_reply_to or "@" not in custom_reply_to:
+        custom_reply_to = get_user_email(username)
+
+    if not subject or not message_text:
+        raise HTTPException(status_code=400, detail="Subject and message text are required.")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM customer WHERE id = %s;", (customer_id,))
+            cust = cur.fetchone()
+            if not cust:
+                raise HTTPException(status_code=404, detail="Customer not found")
+
+        recipient_email = parse_clean_email(cust.get("email") or "")
+        if not recipient_email:
+            raise HTTPException(status_code=400, detail=f"Customer '{cust['legal_name']}' does not have a valid email address configured.")
+
+        clean_reply_to = parse_clean_email(custom_reply_to) or parse_clean_email(get_user_email(username))
+
+        parent_name = (cust.get("parent_name") or get_user_parent_name(username) or "VRT Services").strip()
+        sender_display_name = f"{parent_name} Portal" if "Portal" not in parent_name else parent_name
+        raw_ref = str(cust.get('custumer_number') or cust['id']).strip()
+        cust_ref = raw_ref if raw_ref.upper().startswith("CUST-") else f"CUST-{raw_ref}"
+        ref_tag = f"[Ref: {cust_ref}]"
+        full_subject = subject if ref_tag.lower() in subject.lower() else f"{subject} {ref_tag}"
+
+        # HTML formatted message
+        formatted_html = f"""
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <div style="border-bottom: 2px solid #7f00ff; padding-bottom: 12px; margin-bottom: 20px;">
+                <h2 style="color: #0b0c10; margin: 0; font-size: 1.25rem;">{cust['legal_name']}</h2>
+                <p style="color: #64748b; margin: 4px 0 0 0; font-size: 0.85rem;">Communication Message</p>
+            </div>
+            <div style="white-space: pre-wrap; font-size: 0.95rem; color: #1e293b;">{message_text}</div>
+            <div style="margin-top: 30px; padding-top: 14px; border-top: 1px solid #cbd5e1; font-size: 0.78rem; color: #64748b;">
+                <p style="margin: 0;">Sent via {sender_display_name}. Please reply to this email directly to send files or responses to your account team.</p>
+                <p style="margin: 4px 0 0 0; font-family: monospace; color: #94a3b8;">Ref: {cust_ref}</p>
+            </div>
+        </div>
+        """
+
+        # Resend API credentials
+        resend_key = (
+            os.environ.get("RESEND_API_KEY") or
+            os.environ.get("RESEND_KEY") or
+            os.environ.get("RESEND_API_TOKEN") or
+            os.environ.get("RESEND_TOKEN")
+        )
+        if resend_key:
+            resend_key = resend_key.strip().strip('\'"')
+        raw_from = (
+            os.environ.get("RESEND_FROM_EMAIL") or
+            os.environ.get("FROM_EMAIL") or
+            os.environ.get("SENDER_EMAIL") or
+            "notification@datalazo.net"
+        )
+        clean_from = parse_clean_email(raw_from) or "notification@datalazo.net"
+        from_email = clean_from
+
+        if not resend_key:
+            raise HTTPException(status_code=500, detail="RESEND_API_KEY is not configured in environment variables.")
+
+        payload = {
+            "from": f"{sender_display_name} <{clean_from}>",
+            "to": [recipient_email],
+            "reply_to": clean_reply_to,
+            "subject": full_subject,
+            "html": formatted_html,
+            "text": message_text
+        }
+
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {resend_key.strip()}",
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req) as response:
+            res_body = response.read().decode("utf-8")
+            print(f"[EMAIL SENT] Customer {customer_id} ({recipient_email}): {res_body}")
+
+        # Log outbound communication in database
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO customer_communications (
+                    customer_id, direction, sender_email, recipient_email, reply_to_email,
+                    subject, body_text, status, created_at
+                ) VALUES (
+                    %s, 'OUTBOUND', %s, %s, %s, %s, %s, 'DELIVERED', CURRENT_TIMESTAMP
+                );
+            """, (customer_id, from_email, recipient_email, custom_reply_to, full_subject, message_text))
+            conn.commit()
+
+        return {
+            "success": True,
+            "message": f"Email sent successfully to {recipient_email}",
+            "reply_to": custom_reply_to,
+            "subject": full_subject
+        }
+    except HTTPException as he:
+        raise he
+    except urllib.error.HTTPError as he_err:
+        err_text = he_err.read().decode("utf-8")
+        print(f"Resend HTTP Error: {err_text}")
+        raise HTTPException(status_code=500, detail=f"Resend Email API error: {err_text}")
+    except Exception as e:
+        print(f"Error sending email to customer {customer_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/api/customers/{customer_id}/communications")
+async def get_customer_communications(customer_id: int, request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT * FROM customer_communications
+                WHERE customer_id = %s
+                ORDER BY created_at DESC;
+            """, (customer_id,))
+            records = cur.fetchall()
+
+            history = []
+            for r in records:
+                row = dict(r)
+                if row.get("created_at"):
+                    row["created_at"] = str(row["created_at"])
+                history.append(row)
+
+            return {"communications": history}
+    except Exception as e:
+        print(f"Error fetching communications history for customer {customer_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/api/customers/{customer_id}/communications/mark-read")
+async def mark_customer_communications_read(customer_id: int, request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE customer_communications
+                SET is_read = TRUE, status = 'READ'
+                WHERE customer_id = %s AND direction = 'INBOUND';
+            """, (customer_id,))
+            conn.commit()
+        return {"success": True}
+    except Exception as e:
+        print(f"Error marking communications read for customer {customer_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/api/communications/unread-summary")
+async def get_unread_communications_summary(request: Request):
+    username = get_current_username(request)
+    if not username:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT c.customer_id, cust.legal_name, COUNT(*) as unread_count
+                FROM customer_communications c
+                JOIN customer cust ON c.customer_id = cust.id
+                WHERE c.direction = 'INBOUND' AND (c.is_read = FALSE OR c.is_read IS NULL)
+                GROUP BY c.customer_id, cust.legal_name;
+            """)
+            rows = cur.fetchall()
+            unread_map = {r["customer_id"]: r for r in rows}
+            total_unread = sum(r["unread_count"] for r in rows)
+            return {"total_unread": total_unread, "unread_by_customer": unread_map}
+    except Exception as e:
+        print(f"Error fetching unread communications summary: {e}")
+        return {"total_unread": 0, "unread_by_customer": {}}
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/api/webhooks/resend-inbound")
+async def resend_inbound_webhook(request: Request):
+    """Public webhook receiver for customer reply emails forwarded from Resend."""
+    try:
+        data = await request.json()
+        raw_sender = (data.get("from") or "").strip()
+        sender_email = parse_clean_email(raw_sender) or raw_sender
+        raw_recipient = (data.get("to") or "").strip()
+        recipient_email = parse_clean_email(raw_recipient) or raw_recipient
+        subject = (data.get("subject") or "").strip()
+        body_text = (data.get("text") or data.get("html") or "").strip()
+        attachments = data.get("attachments") or []
+
+        # Parse customer reference code from subject e.g. [Ref: CUST-1001]
+        m = re.search(r'\[Ref:\s*(?:CUST-)?([\w-]+)\]', subject, re.IGNORECASE)
+        cust_number = m.group(1).strip() if m else None
+
+        conn = get_db_connection()
+        customer_id = None
+        legal_name = ""
+        parent_name = ""
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if cust_number:
+                cust_num_with_prefix = f"CUST-{cust_number}" if not cust_number.upper().startswith("CUST-") else cust_number
+                cust_num_raw = cust_number.replace("CUST-", "").replace("cust-", "")
+                cur.execute("""
+                    SELECT id, legal_name, parent_name FROM customer 
+                    WHERE custumer_number ILIKE %s OR custumer_number ILIKE %s OR id::text = %s;
+                """, (cust_number, cust_num_with_prefix, cust_num_raw))
+                cust = cur.fetchone()
+            else:
+                cust = None
+
+            if not cust and sender_email:
+                cur.execute("SELECT id, legal_name, parent_name FROM customer WHERE email ILIKE %s OR email ILIKE %s;", (sender_email, f"%{sender_email}%"))
+                cust = cur.fetchone()
+
+            if cust:
+                customer_id = cust["id"]
+                legal_name = cust["legal_name"]
+                parent_name = cust.get("parent_name")
+
+        if customer_id:
+            # Process & Upload File Attachments if present
+            saved_attachments = []
+            if attachments and isinstance(attachments, list):
+                client, err = get_s3_client()
+                if client:
+                    bucket = os.environ.get("DO_SPACES_BUCKET") or DO_SPACES_BUCKET
+                    clean_name = sanitize_folder_name(legal_name)
+                    p_prefix = f"{sanitize_folder_name(parent_name)}/{clean_name}/" if parent_name else f"{clean_name}/"
+                    target_folder = f"{p_prefix}Tax Documents/"
+
+                    for att in attachments:
+                        att_name = att.get("filename") or "attached_file.pdf"
+                        att_content_b64 = att.get("content") or ""
+                        if att_content_b64:
+                            import base64
+                            file_bytes = base64.b64decode(att_content_b64)
+                            file_key = f"{target_folder}{att_name}"
+                            client.put_object(Bucket=bucket, Key=file_key, Body=file_bytes, ACL='private')
+                            saved_attachments.append(file_key)
+                            print(f"[INBOUND ATTACHMENT SAVED] Key: '{file_key}'")
+
+            # Log inbound communication as UNREAD
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO customer_communications (
+                        customer_id, direction, sender_email, recipient_email,
+                        subject, body_text, attachments_json, status, is_read, created_at
+                    ) VALUES (
+                        %s, 'INBOUND', %s, %s, %s, %s, %s, 'UNREAD', FALSE, CURRENT_TIMESTAMP
+                    );
+                """, (customer_id, sender_email, recipient_email, subject, body_text, json.dumps(saved_attachments)))
+                conn.commit()
+
+            print(f"[RESEND INBOUND WEBHOOK] Logged reply from '{sender_email}' for customer '{legal_name}' (ID: {customer_id})")
+
+            # Send instant email alert notification to team/staff
+            try:
+                resend_key = os.environ.get("RESEND_API_KEY")
+                team_email = parse_clean_email(os.environ.get("RESEND_TO_EMAIL") or "luisdat@gmail.com")
+                raw_from = os.environ.get("RESEND_FROM_EMAIL", "notification@datalazo.net")
+                clean_from = parse_clean_email(raw_from) or "notification@datalazo.net"
+
+                if resend_key:
+                    att_note = f"\n\n📎 {len(saved_attachments)} File Attachment(s) Saved to CRM Storage!" if saved_attachments else ""
+                    alert_payload = {
+                        "from": f"Datalazo CRM Alerts <{clean_from}>",
+                        "to": [team_email],
+                        "subject": f"📩 New Reply Received: {legal_name} - {subject}",
+                        "html": f"""
+                        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #7f00ff; border-radius: 12px; background: #0f172a; color: #f8fafc;">
+                            <h2 style="color: #38bdf8; margin-top: 0;">📩 New Customer Email Reply Received</h2>
+                            <p><strong>Customer:</strong> {legal_name} (ID: {customer_id})</p>
+                            <p><strong>From:</strong> {sender_email}</p>
+                            <p><strong>Subject:</strong> {subject}</p>
+                            <div style="background: #1e293b; padding: 14px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; margin: 16px 0; border-left: 4px solid #38bdf8; color: #e2e8f0;">
+                                {body_text[:1000]}
+                            </div>
+                            {'<p style="color: #34d399;"><strong>' + att_note + '</strong></p>' if saved_attachments else ''}
+                            <p><a href="http://localhost:8000/dashboard" style="background: #3b82f6; color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">Open CRM Dashboard</a></p>
+                        </div>
+                        """
+                    }
+                    alert_req = urllib.request.Request(
+                        "https://api.resend.com/emails",
+                        data=json.dumps(alert_payload).encode("utf-8"),
+                        headers={
+                            "Authorization": f"Bearer {resend_key.strip()}",
+                            "Content-Type": "application/json",
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                        },
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(alert_req) as alert_resp:
+                        print(f"[TEAM ALERT SENT] Inbound email notification sent to {team_email}")
+            except Exception as e_alert:
+                print(f"[TEAM ALERT ERROR] Failed to send team email alert: {e_alert}")
+
+        conn.close()
+        return {"status": "success", "customer_id": customer_id}
+    except Exception as e:
+        print(f"Error handling Resend Inbound Webhook: {e}")
+        return {"status": "error", "message": str(e)}
 
 # ── Health / debug ─────────────────────────────────────────────────────────────
 @app.get("/health")
@@ -2114,5 +4269,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True, reload_includes=["*.py", "*.html", "*.js"])
 

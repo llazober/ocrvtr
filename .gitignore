@@ -14,10 +14,14 @@ env/
 *.json
 !datalazo.config.json
 !requirements*.txt
+.env
+.env.*
 
 # Temp files
 *.csv
 *.png
+*.pdf
+scratch_*.js
 temp_*/
 
 # IDE
